@@ -1,0 +1,60 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# Example code in package build process
+*-Ex.R
+
+# RStudio files
+.Rproj.user/
+
+# produced vignettes
+vignettes/*.html
+vignettes/*.pdf
+
+# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+.httr-oauth
+
+
+#-------------------
+# emacs
+*~
+*.elc
+[#]*[#]
+
+#-------------------
+# compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+#-------------------
+# packed files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+#-------------------
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+#-------------------
+# OS junk
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db

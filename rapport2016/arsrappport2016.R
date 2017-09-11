@@ -18,10 +18,8 @@ setnames(data.value, 1:ncol(data.value), paste(names(data.value), "v", sep = "_"
 ## View(regdata)
 
 reshID <- levels(data.value$ReshId_v)
+reshID <- iconv(reshID, "latin1", "utf-8") #konvertere til utf-8
 regdata[, ReshNavn := ReshId][, setattr(ReshNavn, "levels", reshID)]
-
-## konvertere til utf-8
-regdata$ReshNavn <- iconv(regdata$ReshNavn, "latin1", "utf-8")
 
 
 ##############

@@ -58,3 +58,7 @@ vignettes/*.pdf
 .Spotlight-V100
 .Trashes
 Thumbs.db
+*.jpg
+*.pdf
+/rapport2016/datakilder01.R
+*.png

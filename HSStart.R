@@ -23,9 +23,9 @@ maxAlder <- 150 #maximum alder
 ## Skal sammenlignes?
 #########################
 
-ReshID <- 100021 
+ReshID <- 100021
 
-Resultat <- 0
+Resultat <- 1
 
 ## 0 - hele landet
 ## 1 - egen HF mot resten av landet
@@ -35,7 +35,7 @@ Resultat <- 0
 ## Valg variabel fra listen
 ##############################
 
-Variabel <- "Overlevelse30d"  #skrev utvalgte variabel med " "
+Variabel <- "Alder"  #skrev utvalgte variabel med " "
 
 ## Variablene å velge mellom er:-
 ## Gender, Alder, FirstRytme, Observert, HLRbefore, Tidsbruk, Vedvarende_ROSC, Overlever24h, Overlevelse30d
@@ -48,4 +48,3 @@ valgtVar <- Variabel
 FigAndeler(RegData = RegData, valgtVar = valgtVar,
            libkat = libkat, ReshID = ReshID, outfile = outfile,
            minAlder = minAlder, maxAlder = maxAlder)
-

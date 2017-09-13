@@ -242,11 +242,13 @@ koll <- grep("*rtellersettav$", colnames(reg), value = TRUE)
 kollv <- reg[, list(n = .N),  by = get(koll)]
 kollv[, sum := sum(n)][, pro := format(round(n / sum * 100), nsmall = 0)] #ingen decimal
 
-#### Ingen, ukjent og ikke valgt bør slå sammen
+#### kategorier: Ingen, ukjent og ikke valgt bør slå sammen
 
 kollv$value <- factor(kollv$get,
                       levels = c(-1, 0, 1, 99, 999),
                       labels = c("Ikke valgt", "Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
+
+
 
 ## Endre tilbake til norsk locale
 Sys.setlocale("LC_ALL", "nb_NO.UTF-8")

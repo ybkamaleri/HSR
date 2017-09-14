@@ -337,8 +337,9 @@ kollper <- kollalle[kollaps == 1]
 bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
 kollperfig <- kollper[ReshId %in% (bortHF)]
 
-title <- "Kollaps hørt eller sett av\n ambulansepersonell"
+title <- " "
 ylab <- "Prosent (%)"
+
 
 fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
@@ -347,11 +348,18 @@ fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
   ##               position = position_dodge(.9)) +
   coord_flip() +
   ##guides(fill = FALSE) +
-  labs(title = title, y = ylab) +
+  labs(title = title, y = ylab, caption = "HF med pasienter < 6 er eksludert") +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
   theme2
 
+## ## Add notes
+## library(grid)
+## library(gridExtra)
+## grid.newpage()
+## footnote <- "HF med < 5 er eksludert"
+## fig3 <- arrangeGrob(fig3, buttom = textGrob(footnote, x = 0, hjust = -0.1, vjust = 0.1, gp = gpar(fontface = "italic", fontsize = 9)))
+## grid.draw(fig3)
 
 ## save file generic
 fig1 <- fig3
@@ -368,3 +376,7 @@ dev.off()
 
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
+
+
+##########################==============##################
+### Utsteinkomparatorgruppe - Vedvarende ROSC

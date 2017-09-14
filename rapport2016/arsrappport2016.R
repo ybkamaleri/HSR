@@ -49,19 +49,39 @@ blank_theme <- theme_minimal()+
     axis.ticks = element_blank(),
     plot.title=element_text(size=14, face="bold"))
 
-
+## Theme uten title axis-y
 theme2 <- theme_bw() +
   theme(
+    axis.text = element_text(size = 10), #text for y and x axis
     axis.ticks.y = element_blank(),
     axis.line.x = element_line(size = 0.5),
     axis.title.y = element_blank(),
-    axis.title.x = element_text(size = 9),
+    axis.title.x = element_text(size = 12),
     plot.margin = unit(c(0, 2, 1,1), 'cm'),
-    plot.title = element_text(size = 13),
+    plot.title = element_text(size = 14),
     panel.background = element_blank(),
     panel.border = element_blank(),
     panel.grid.major.y = element_blank(),
-    panel.grid.major.x = element_blank())
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank())
+
+
+## Theme med title axis-y
+theme3 <- theme_bw() +
+  theme(
+    panel.grid.major.x = element_line(colour = "grey", size = 0.4),
+    panel.grid.minor.x = element_line(color = "grey", size = 0.2, linetype = 2),
+    panel.grid.major.y = element_blank(),
+    panel.background = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.margin = unit(c(0, 2, 1,1), 'cm'),
+    panel.border = element_blank(),
+    axis.text = element_text(size = 10),
+    axis.ticks.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_line(size = 0.5),
+    axis.title.y = element_text(size = 12),
+    axis.title.x = element_text(size = 12))
 
 ## Farge
 col1 <- "#6DAED6" # #28f
@@ -122,9 +142,11 @@ regdata[, .N, by = list(ReshId, ReshNavn)]
 
 ## Filteret dataset
 reg <- regdata[AnyBystander_CPR == 1 | HLRvedakuttmedisinskpersonell == 0,]
+## Antall pasienter
+totalN <- dim(reg)[1]
 
-dim(reg)
-reg[, .N, by = list(ReshId, ReshNavn)]
+## Antall N per HF
+regHF <- reg[, .N, by = list(ReshId, ReshNavn)]
 
 ## Kjønn
 reg[, gender := PatientGender]
@@ -132,7 +154,8 @@ reg$gender <- factor(reg$gender,
                      levels = c(1, 2),
                             labels = c("mann", "kvinne"))
 
-reg[, .N, by = list(ReshNavn, gender)]
+## Antall per HF og kjønn
+regGender <- reg[, .N, by = list(ReshNavn, gender)]
 
 
 
@@ -171,18 +194,9 @@ ageAlle <- ggplot(regAge, aes(ageKat, N)) +
   geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
   labs(title = "Aldersfordeling", y = "Antall pasienter", x = "Pasientens alder") +
   scale_y_continuous(expand = c(0,0)) +
-  coord_flip() + theme_bw() +
-  theme(
-    panel.grid.major.x = element_line(colour = "grey", size = 0.4),
-    panel.grid.minor.x = element_line(color = "grey", size = 0.2, linetype = 2),
-    panel.grid.major.y = element_blank(),
-    panel.background = element_blank(),
-    panel.border = element_blank(),
-    axis.ticks.y = element_blank(),
-    axis.line.y = element_blank(),
-    axis.line.x = element_line(size = 0.5),
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_text(size = 12))
+  coord_flip() +
+  theme3
+
 
 
 figAge1 <- ggplot_gtable(ggplot_build(ageAlle))
@@ -191,6 +205,7 @@ cowplot::save_plot("~/Git-work/HSR/rapport2016/fig/Alder.jpg", figAge1, base_hei
 cowplot::save_plot("~/Git-work/HSR/rapport2016/fig/Alder.pdf", figAge1, base_height = 7, base_width = 7)
 grid.draw(ageAlle)
 dev.off()
+
 
 
 ## Mean age med HF
@@ -203,10 +218,9 @@ ageN <- reg[, .( mean = mean(PatientAge),
                 n = .N,
                 sd = sd(PatientAge))]
 
-
+## Merge both
 ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)
 ## alt. to use rbind if position for colnames not at the same position
-
 
 
 fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
@@ -230,37 +244,127 @@ cowplot::save_plot(paste(savefig, "AlderMean.pdf", sep = "/"), fig1a, base_heigh
 dev.off()
 
 
-##############################
+############################## =================================
 ## Kollaps hørt eller sett av
 
 ## if problem with locale when running "grep" then run this
 Sys.setlocale(locale = "C")
 
 koll <- grep("*rtellersettav$", colnames(reg), value = TRUE)
+## rename variable to 'kollaps'
+reg[, kollaps := get(koll)]
+
+## recode 'ikke valgt' and 'Ukjent' to 999
+reg[list(kollaps = c(-1, 999), to = 999), on = "kollaps", kollaps := i.to]
+
+## count for each category of kollaps
+kollv <- reg[, list(n = .N),  by = kollaps]
+## Get prosent
+kollv[, sum := sum(n)][, pro := as.numeric(format(round(n / sum * 100), nsmall = 0))] #ingen decimal
+## give value names
+kollv$value <- factor(kollv$kollaps,
+                      levels = c(0, 1, 99, 999),
+                      labels = c("Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
 
 
-kollv <- reg[, list(n = .N),  by = get(koll)]
-kollv[, sum := sum(n)][, pro := format(round(n / sum * 100), nsmall = 0)] #ingen decimal
-
-kollv[list(get = c(-1, 999), to = 999), on = "get", get := i.to] #recode alt annen enn 0 ,1 og 99 to 999
-
-#### kategorier: ukjent og ikke valgt bør slå sammen
-
-kollv$value <- factor(kollv$get,
-                      levels = c(-1, 0, 1, 99, 999),
-                      labels = c("Ikke valgt", "Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
-
-
-kollv[, sum(n), by = value]
-
-## Endre tilbake til norsk locale
+## Endre tilbake til norsk locale for å få norske bokstaver
 Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
 kollv$value <- iconv(kollv$value, "utf-8", "latin1")
 
-(fig2 <- ggplot(kollv, aes(value, pro)) +
-   geom_bar(stat = 'identity', fill = col1) +
-   ## geom_text(data = kollv, aes(x = value, label = n), size = 3) +
-   labs(title = "Kollaps hørt eller sett av", y = "Prosent", x = "") +
-   ## coord_flip() +
-   theme_classic()
-)
+## include N in the value name
+kollv[, fig:=paste0(value, " (N=", n, ")")]
+
+fig2 <- ggplot(kollv, aes(fig, pro)) +
+  geom_bar(stat = 'identity', fill = col1) +
+  geom_text(data = kollv, aes(y = pro + 2, label = pro), size = 3) +
+  labs(title = "Kollaps hørt eller sett av", y = "Prosent", x = "") +
+  coord_flip() +
+  theme2
+
+
+## save file generic
+fig1 <- fig2
+title <- "Kollaps"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+#################### ===================================
+## Kollaps hørt eller sett av per HF
+
+## antall per kollpas category er HF
+kollHF <- reg[, .N, by = list(ReshId, ReshNavn, kollaps)]
+
+## Antall kollaps per HF
+kollHF[, sum := sum(N), by = .(ReshId)]
+
+## Prosent hver kollaps kategori
+kollHF[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
+
+
+## Hele landet
+nor <- "Norge"
+norge <- reg[, .N, by = .(kollaps)]
+norge[, sum := sum(N)]
+norge[, ReshId := 99999]
+norge[, ReshNavn := (nor)]
+norge[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
+
+### Kombinere begge datasett
+kollalle <- rbindlist(list(kollHF, norge), use.names = TRUE)
+
+## include N in HF names
+kollalle[, fig := paste0(ReshNavn, " (N=", N, ")")]
+
+
+##########################
+## Kollaps sett av Helse personell
+
+## keep only kollaps sett av Akuttmedisinskpersonnell = 1
+kollper <- kollalle[kollaps == 1]
+
+## ta bort HF med cases < 5
+bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
+kollperfig <- kollper[ReshId %in% (bortHF)]
+
+title <- "Kollaps hørt eller sett av\n ambulansepersonell"
+ylab <- "Prosent (%)"
+
+fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
+  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+  geom_text(aes(y = pros + 1, label =  paste0(pros, "%")), size = 3.5) +
+  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+  ##               position = position_dodge(.9)) +
+  coord_flip() +
+  ##guides(fill = FALSE) +
+  labs(title = title, y = ylab) +
+  scale_fill_manual(values = col2, guide = 'none') +
+  scale_y_continuous(expand = c(0,0)) +
+  theme2
+
+
+## save file generic
+fig1 <- fig3
+title <- "settAmbulanse"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL

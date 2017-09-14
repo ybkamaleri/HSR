@@ -187,15 +187,17 @@ regAge <- reg[, .N, by = .(ageKat)]
 ## Position for text when N > 40
 regAge[, pos := ifelse(N > 40, 1, 0)]
 
+title <- " "
+
 ## Figure Age categories
-ageAlle <- ggplot(regAge, aes(ageKat, N)) +
-  geom_bar(stat='identity', fill = col1) +
-  geom_text(data = regAge[pos == 1], aes(x = ageKat, y = N - 10, label = N), size = 3) +
-  geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
-  labs(title = "Aldersfordeling", y = "Antall pasienter", x = "Pasientens alder") +
-  scale_y_continuous(expand = c(0,0)) +
-  coord_flip() +
-  theme3
+  ageAlle <- ggplot(regAge, aes(ageKat, N)) +
+    geom_bar(stat='identity', fill = col1) +
+    geom_text(data = regAge[pos == 1], aes(x = ageKat, y = N - 10, label = N), size = 3) +
+    geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
+    labs(title = title, y = "Antall pasienter", x = "Pasientens alder") +
+    scale_y_continuous(expand = c(0,0)) +
+    coord_flip() +
+    theme3
 
 
 
@@ -222,15 +224,16 @@ ageN <- reg[, .( mean = mean(PatientAge),
 ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)
 ## alt. to use rbind if position for colnames not at the same position
 
+title <- " "
 
 fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
-  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-  geom_text(aes(y = 5, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
-  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
-  ##               position = position_dodge(.9)) +
-  coord_flip() +
-  ##guides(fill = FALSE) +
-  labs(title = "Gjennomsnitt alder", y = "Gjennomsnitt alder") +
+    geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+    geom_text(aes(y = 5, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
+    ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+    ##               position = position_dodge(.9)) +
+    coord_flip() +
+    ##guides(fill = FALSE) +
+  labs(title = title, y = "Gjennomsnitt alder") +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
   theme2
@@ -274,10 +277,12 @@ kollv$value <- iconv(kollv$value, "utf-8", "latin1")
 ## include N in the value name
 kollv[, fig:=paste0(value, " (N=", n, ")")]
 
+title <- " "
+
 fig2 <- ggplot(kollv, aes(fig, pro)) +
-  geom_bar(stat = 'identity', fill = col1) +
-  geom_text(data = kollv, aes(y = pro + 2, label = pro), size = 3) +
-  labs(title = "Kollaps hørt eller sett av", y = "Prosent", x = "") +
+    geom_bar(stat = 'identity', fill = col1) +
+    geom_text(data = kollv, aes(y = pro + 2, label = pro), size = 3) +
+  labs(title = title, y = "Prosent", x = "") +
   coord_flip() +
   theme2
 
@@ -380,3 +385,8 @@ fig1 <- NULL
 
 ##########################==============##################
 ### Utsteinkomparatorgruppe - Vedvarende ROSC
+
+Sys.setlocale(locale = "C") #need to change to C lang to be able to use grep coz of text format
+var02 <- grep("rsaktilhjertestans", colnames(reg)) #get index
+
+Sys.setlocale(locale = "") #set back to default

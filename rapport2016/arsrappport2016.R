@@ -2,7 +2,7 @@
 rm(list = ls())
 
 source("datakilder01.R")
-
+source("setuphrs2016.R")
 ## Data ##
 ## regdata - data uten value label
 ## data.value - value label
@@ -36,98 +36,6 @@ library('tidyr')
 library('gridExtra')
 library('grid')
 library('cowplot')
-
-## Theme
-blank_theme <- theme_minimal()+
-  theme(
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    panel.border = element_blank(),
-    panel.grid = element_blank(),
-    legend.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    plot.title=element_text(size=14, face="bold"))
-
-## Theme uten title axis-y
-theme2 <- theme_bw() +
-  theme(
-    axis.text = element_text(size = 10), #text for y and x axis
-    axis.ticks.y = element_blank(),
-    axis.line.x = element_line(size = 0.5),
-    axis.title.y = element_blank(),
-    axis.title.x = element_text(size = 12),
-    plot.margin = unit(c(0, 2, 1,1), 'cm'),
-    plot.title = element_text(size = 14),
-    panel.background = element_blank(),
-    panel.border = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank())
-
-
-## Theme med title axis-y
-theme3 <- theme_bw() +
-  theme(
-    panel.grid.major.x = element_line(colour = "grey", size = 0.4),
-    panel.grid.minor.x = element_line(color = "grey", size = 0.2, linetype = 2),
-    panel.grid.major.y = element_blank(),
-    panel.background = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.margin = unit(c(0, 2, 1,1), 'cm'),
-    panel.border = element_blank(),
-    axis.text = element_text(size = 10),
-    axis.ticks.y = element_blank(),
-    axis.line.y = element_blank(),
-    axis.line.x = element_line(size = 0.5),
-    axis.title.y = element_text(size = 12),
-    axis.title.x = element_text(size = 12))
-
-## Farge
-col1 <- "#6DAED6" # #28f
-cols <- c("#c6dbef", "#6baed6","#4292c6", "#2171b5", "#084594", "#000059")
-col2 <- c("#6baed6","#0845ff")
-col4 <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
-
-## Telling HF
-telling <- function(data, by1 , by2) {
-  library(dplyr)
-
-  dataN <- data %>%
-    group_by_(by1) %>%
-    tally %>%
-    mutate(pct = n/sum(n) * 100) %>%
-    mutate(HF = "Norge")
-
-  dataHF <- data %>%
-    group_by_(by2, by1) %>%
-    tally %>%
-    mutate(pct = n/sum(n) * 100)
-
-  dataAll <- full_join(dataN, dataHF)
-
-  return(dataAll)
-}
-
-## Telling RHF
-tellingRHF <- function(data, by1 , by2) {
-  library(dplyr)
-
-  dataN <- data %>%
-    group_by_(by1) %>%
-    tally %>%
-    mutate(pct = n/sum(n) * 100) %>%
-    mutate(RHF1 = "Norge")
-
-  dataRHF <- data %>%
-    group_by_(by2, by1) %>%
-    tally %>%
-    mutate(pct = n/sum(n) * 100)
-
-  dataAll <- full_join(dataN, dataRHF)
-
-  return(dataAll)
-}
 
 ## Hvor skal figurene lages?
 savefig <- "~/Git-work/HSR/rapport2016/fig"
@@ -257,6 +165,9 @@ koll <- grep("*rtellersettav$", colnames(reg), value = TRUE)
 ## rename variable to 'kollaps'
 reg[, kollaps := get(koll)]
 
+## set back locale to default
+Sys.setlocale(locale = "")
+
 ## recode 'ikke valgt' and 'Ukjent' to 999
 reg[list(kollaps = c(-1, 999), to = 999), on = "kollaps", kollaps := i.to]
 
@@ -270,9 +181,9 @@ kollv$value <- factor(kollv$kollaps,
                       labels = c("Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
 
 
-## Endre tilbake til norsk locale for å få norske bokstaver
-Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
-kollv$value <- iconv(kollv$value, "utf-8", "latin1")
+## ## Endre tilbake til norsk locale for å få norske bokstaver
+## Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
+## kollv$value <- iconv(kollv$value, "utf-8", "latin1")
 
 ## include N in the value name
 kollv[, fig:=paste0(value, " (N=", n, ")")]

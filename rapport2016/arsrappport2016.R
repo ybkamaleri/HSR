@@ -389,4 +389,8 @@ fig1 <- NULL
 Sys.setlocale(locale = "C") #need to change to C lang to be able to use grep coz of text format
 var02 <- grep("rsaktilhjertestans", colnames(reg)) #get index
 
+## Bruk filter som Ingvild har gjort i SPSS
+fil02 <- grep("^filter_", colnames(reg), value = TRUE)
+reg[, filrosc := as.factor(get(fil02))]
+
 Sys.setlocale(locale = "") #set back to default

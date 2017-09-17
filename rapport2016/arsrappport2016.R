@@ -76,18 +76,7 @@ for (i in seq_along(nr)) {
   set(reg, i = NULL, j = nr[i], value = as.numeric(reg[[nr[i]]]))
 }
 
-
-##  Alder del i kategorier
-alder.kat <- function(x, lower, upper, by,
-                      sep = "-") {
-  labs <- c(paste(seq(lower, upper - by, by = by),
-                  seq(lower + by - 1, upper - 1, by = by),
-                  sep = sep),
-            paste(upper, "+", sep = ""))
-  cut(floor(x), breaks = c(seq(lower, upper, by = by), Inf),
-      include.lowest = TRUE, right = FALSE, labels = labs)
-}
-
+## alder.kat funksjon lages i setup
 reg[, ageKat := alder.kat(PatientAge, 0, 100, 5)]
 regAge <- reg[, .N, by = .(ageKat)]
 
@@ -106,7 +95,6 @@ title <- " "
     scale_y_continuous(expand = c(0,0)) +
     coord_flip() +
     theme3
-
 
 
 figAge1 <- ggplot_gtable(ggplot_build(ageAlle))
@@ -185,6 +173,9 @@ kollv$value <- factor(kollv$kollaps,
 ## Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
 ## kollv$value <- iconv(kollv$value, "utf-8", "latin1")
 
+####################################
+## Lage figur ======================
+
 ## include N in the value name
 kollv[, fig:=paste0(value, " (N=", n, ")")]
 
@@ -243,7 +234,7 @@ kollalle <- rbindlist(list(kollHF, norge), use.names = TRUE)
 kollalle[, fig := paste0(ReshNavn, " (N=", N, ")")]
 
 
-##########################
+##########################========================
 ## Kollaps sett av Helse personell
 
 ## keep only kollaps sett av Akuttmedisinskpersonnell = 1

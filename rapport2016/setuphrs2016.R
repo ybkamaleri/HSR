@@ -1,3 +1,15 @@
+###########################
+##  Alder del i kategorier
+###########################
+alder.kat <- function(x, lower, upper, by,
+                      sep = "-") {
+  labs <- c(paste(seq(lower, upper - by, by = by),
+                  seq(lower + by - 1, upper - 1, by = by),
+                  sep = sep),
+            paste(upper, "+", sep = ""))
+  cut(floor(x), breaks = c(seq(lower, upper, by = by), Inf),
+      include.lowest = TRUE, right = FALSE, labels = labs)
+}
 
 ###########################
 ## plot theme

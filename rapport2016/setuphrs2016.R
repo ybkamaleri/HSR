@@ -2,6 +2,7 @@
 ###########################
 ## plot theme
 ###########################
+library(ggplot2)
 
 ## Theme
 blank_theme <- theme_minimal()+

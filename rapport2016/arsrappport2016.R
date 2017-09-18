@@ -143,13 +143,15 @@ cowplot::save_plot(paste(savefig, "AlderMean.pdf", sep = "/"), fig1a, base_heigh
 dev.off()
 
 
-############################## =================================
+###############################
 ## Kollaps hørt eller sett av
+###############################
 
 ## if problem with locale when running "grep" then run this
 Sys.setlocale(locale = "C")
 
-koll <- grep("*rtellersettav$", colnames(reg), value = TRUE)
+koll <- grep("*rtellersettav$", colnames(reg), value = TRUE) #name
+
 ## rename variable to 'kollaps'
 reg[, kollaps := get(koll)]
 
@@ -173,17 +175,19 @@ kollv$value <- factor(kollv$kollaps,
 ## Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
 ## kollv$value <- iconv(kollv$value, "utf-8", "latin1")
 
-####################################
+
 ## Lage figur ======================
 
 ## include N in the value name
 kollv[, fig:=paste0(value, " (N=", n, ")")]
 
 title <- " "
+## text position
+kollv[, ypos := pro + (0.05 * max(pro))]
 
 fig2 <- ggplot(kollv, aes(fig, pro)) +
-    geom_bar(stat = 'identity', fill = col1) +
-    geom_text(data = kollv, aes(y = pro + 2, label = pro), size = 3) +
+  geom_bar(stat = 'identity', fill = col1) +
+  geom_text(data = kollv, aes(y = ypos, label = pro), size = 3) +
   labs(title = title, y = "Prosent", x = "") +
   coord_flip() +
   theme2
@@ -206,8 +210,9 @@ dev.off()
 fig1 <- NULL
 
 
-#################### ===================================
+########################################
 ## Kollaps hørt eller sett av per HF
+########################################
 
 ## antall per kollpas category er HF
 kollHF <- reg[, .N, by = list(ReshId, ReshNavn, kollaps)]
@@ -217,7 +222,6 @@ kollHF[, sum := sum(N), by = .(ReshId)]
 
 ## Prosent hver kollaps kategori
 kollHF[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
-
 
 ## Hele landet
 nor <- "Norge"
@@ -231,7 +235,7 @@ norge[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
 kollalle <- rbindlist(list(kollHF, norge), use.names = TRUE)
 
 ## include N in HF names
-kollalle[, fig := paste0(ReshNavn, " (N=", N, ")")]
+kollalle[, fig := paste0(ReshNavn, " (N=", sum, ")")]
 
 
 ##########################========================
@@ -240,22 +244,28 @@ kollalle[, fig := paste0(ReshNavn, " (N=", N, ")")]
 ## keep only kollaps sett av Akuttmedisinskpersonnell = 1
 kollper <- kollalle[kollaps == 1]
 
-## ta bort HF med cases < 5
-bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
-kollperfig <- kollper[ReshId %in% (bortHF)]
+## ## ta bort HF med cases < 5
+## bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
+## kollperfig <- kollper[ReshId %in% (bortHF)]
 
 title <- " "
 ylab <- "Prosent (%)"
 
+## text position
+kollper[, ypos := pros + (0.05 * max(pros))]
+
+## N < 5 gi prosent == 0
+kollperfig <- kollper[, pros := ifelse(N < 6, 0, pros)]
 
 fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-  geom_text(aes(y = pros + 1, label =  paste0(pros, "%")), size = 3.5) +
+  geom_text(data = kollperfig[N > 5], aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = kollperfig[N < 6], aes(y = 1.5, label = "n<6"), size = 3.5) +
   ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
   ##               position = position_dodge(.9)) +
   coord_flip() +
   ##guides(fill = FALSE) +
-  labs(title = title, y = ylab, caption = "HF med pasienter < 6 er eksludert") +
+  labs(title = "", y = ylab) +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
   theme2
@@ -270,14 +280,14 @@ fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
 
 ## save file generic
 fig1 <- fig3
-title <- "settAmbulanse"
+filnavn <- "settAmbulanse"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
 fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
 grid.draw(fig1a)
-cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
-cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".pdf"), fig1a, base_height = 7, base_width = 7)
 ## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
 dev.off()
 
@@ -289,10 +299,119 @@ fig1 <- NULL
 ### Utsteinkomparatorgruppe - Vedvarende ROSC
 
 Sys.setlocale(locale = "C") #need to change to C lang to be able to use grep coz of text format
-var02 <- grep("rsaktilhjertestans", colnames(reg)) #get index
 
-## Bruk filter som Ingvild har gjort i SPSS
-fil02 <- grep("^filter_", colnames(reg), value = TRUE)
-reg[, filrosc := as.factor(get(fil02))]
+## grep index "Årsaktilhjertestans"
+var02 <- grep("rsaktilhjertestans", names(reg), value = TRUE) #name
+## rename
+reg[, arsak_hs := get(var02)]
+
+## filter variable som Ingvild laget i SPSS
+var03 <- grep("^filter", names(reg), value = TRUE)
+reg[, filter := get(var03)] #rename to filter
 
 Sys.setlocale(locale = "") #set back to default
+
+
+## recode to factor
+setindex(reg, NULL) #unset previous index
+reg[, filter := as.factor(filter)]
+setindex(reg, filter)
+indices(reg)
+
+##### per HF
+## ROSC == JA
+rosc1 <- reg[filter == 1 & VedvarendeROSC == 0, .N, by = ReshNavn]
+setkey(rosc1, ReshNavn)
+## ROSC er JA og Nei - Ikke valgt og Ukjent eksludert
+rosc2 <- reg[filter == 1 & VedvarendeROSC %in% c(0, 1), list(sum = .N), by = ReshNavn]
+setkey(rosc2, ReshNavn)
+
+##merge both
+roscHF <- rosc1[rosc2]
+
+## merge(rosc1, rosc2, all = TRUE) #alternative
+
+### Norge
+## ROSC == JA
+rosc3 <- reg[filter == 1 & VedvarendeROSC == 0, list( N = .N,
+                                                     ReshNavn = "Norge")]
+setkey(rosc3, ReshNavn)
+## ROSC er JA og Nei - Ikke valgt og Ukjent eksludert
+rosc4 <- reg[filter == 1 & VedvarendeROSC %in% c(0, 1), list(sum = .N,
+                                                             ReshNavn = "Norge")]
+setkey(rosc4, ReshNavn)
+
+roscNorge <-rosc3[rosc4]
+
+## Row bind HF og Norge
+roscAlle <- rbindlist(list(roscHF, roscNorge), use.names = TRUE)
+
+## Prosent
+roscAlle[, pros := format(round(N / sum * 100))]
+
+## If sum <6 prosent is 0
+roscAlle[, pros := ifelse(sum < 6, 0, pros)]
+
+## Reorder prosent with highst on the top
+roscAlle <- roscAlle[order(-pros)]
+
+roscAlle[, ReshTxt := paste0(ReshNavn, " (N=", sum, ")")]
+## N < 6
+roscAlle[, ReshTxt := ifelse(pros != 0, ReshTxt, paste0(ReshNavn, "(N < 6)"))]
+## ## Delete N if N < 6
+## roscAlle[, ReshTxt := ifelse(sum < 6, paste0(ReshNavn), ReshTxt)]
+
+#####
+## Figure
+
+roscAlle[, pros := lapply(.SD, function(x) as.integer(x)), .SDcol = "pros"]
+
+## text position
+roscAlle[, ypos := pros + (0.05 * max(pros))]
+
+
+fig4 <- ggplot(roscAlle, aes(x=reorder(ReshTxt, pros), y = pros)) +
+  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+  geom_text(data = roscAlle[pros != 0], aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = roscAlle[pros == 0], aes(y = ypos + 2, label = "")) +
+  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+  ##               position = position_dodge(.9)) +
+  coord_flip() +
+  ##guides(fill = FALSE) +
+  labs(title = "", y = ylab, caption = "HF med pasienter < 6 er eksludert") +
+  scale_fill_manual(values = col2, guide = 'none') +
+  scale_y_continuous(expand = c(0,0)) +
+  theme2
+
+## ## Add notes
+## library(grid)
+## library(gridExtra)
+## grid.newpage()
+## footnote <- "HF med < 5 er eksludert"
+## fig3 <- arrangeGrob(fig3, buttom = textGrob(footnote, x = 0, hjust = -0.1, vjust = 0.1, gp = gpar(fontface = "italic", fontsize = 9)))
+## grid.draw(fig3)
+
+## save file generic
+fig1 <- fig4
+filnavn <- "ROSC"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+
+## library(qicharts2)
+## qic(x = ReshNavn, y = N,
+##     n = sum,
+##     data = roscAlle,
+##     y.percent = TRUE,
+##     flip = TRUE)

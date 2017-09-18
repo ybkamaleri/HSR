@@ -120,15 +120,19 @@ ageN <- reg[, .( mean = mean(PatientAge),
 ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)
 ## alt. to use rbind if position for colnames not at the same position
 
+## Y text position
+ageAlle[, ypos := 0.06 * max(mean)]
+
 title <- " "
 
 fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
     geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-    geom_text(aes(y = 5, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
-    ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
-    ##               position = position_dodge(.9)) +
-    coord_flip() +
-    ##guides(fill = FALSE) +
+  geom_text(data = ageAlle[ReshNavn != "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
+  geom_text(data = ageAlle[ReshNavn == "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5, color = "white") +
+  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+  ##               position = position_dodge(.9)) +
+  coord_flip() +
+  ##guides(fill = FALSE) +
   labs(title = title, y = "Gjennomsnitt alder") +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
@@ -357,7 +361,7 @@ roscAlle <- roscAlle[order(-pros)]
 
 roscAlle[, ReshTxt := paste0(ReshNavn, " (N=", sum, ")")]
 ## N < 6
-roscAlle[, ReshTxt := ifelse(pros != 0, ReshTxt, paste0(ReshNavn, "(N < 6)"))]
+roscAlle[, ReshTxt := ifelse(pros != 0, ReshTxt, paste0(ReshNavn, " (N < 6)"))]
 ## ## Delete N if N < 6
 ## roscAlle[, ReshTxt := ifelse(sum < 6, paste0(ReshNavn), ReshTxt)]
 

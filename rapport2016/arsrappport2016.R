@@ -284,7 +284,7 @@ fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
 
 ## save file generic
 fig1 <- fig3
-filnavn <- "settAmbulanse"
+filnavn <- "KollapsSettAvAmbulanse"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
@@ -373,16 +373,19 @@ roscAlle[, pros := lapply(.SD, function(x) as.integer(x)), .SDcol = "pros"]
 ## text position
 roscAlle[, ypos := pros + (0.05 * max(pros))]
 
+## ta bort cases < 6
+roscAlle1 <- roscAlle[, pros := ifelse(N < 6, 0, pros)]
+roscAlle1 <- roscAlle[, pros := ifelse(is.na(pros), 0, pros)]#when NA
 
-fig4 <- ggplot(roscAlle, aes(x=reorder(ReshTxt, pros), y = pros)) +
+fig4 <- ggplot(roscAlle1, aes(x=reorder(ReshTxt, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-  geom_text(data = roscAlle[pros != 0], aes(y = ypos, label = pros), size = 3.5) +
-  geom_text(data = roscAlle[pros == 0], aes(y = ypos + 2, label = "")) +
+  geom_text(data = roscAlle1[pros != 0], aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = roscAlle1[pros == 0], aes(y = 0.05 * max(roscAlle1$pros), label = "n<6")) +
   ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
   ##               position = position_dodge(.9)) +
   coord_flip() +
   ##guides(fill = FALSE) +
-  labs(title = "", y = ylab, caption = "HF med pasienter < 6 er eksludert") +
+  labs(title = "", y = ylab) +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
   theme2
@@ -412,10 +415,39 @@ dev.off()
 fig1 <- NULL
 
 
+## Prosess control
+library(qicharts2)
 
-## library(qicharts2)
-## qic(x = ReshNavn, y = N,
-##     n = sum,
-##     data = roscAlle,
-##     y.percent = TRUE,
-##     flip = TRUE)
+## exclude Norge (gjennonsnitt) og N < 6
+pcROSC <- roscAlle[ReshNavn != "Norge"] #tar bort Norge
+pcROSC <- pcROSC[pros != 0]
+pcROSC$ReshNavn <- factor(pcROSC$ReshNavn, levels = pcROSC$ReshNavn[order(-pcROSC$sum)])
+
+
+fig5 <- qic(x = ReshNavn, y = N,
+            n = sum,
+              data = pcROSC,
+              chart = 'p',
+              y.percent = TRUE,
+              title = "",
+            ylab = "",
+            xlab = "",
+            flip = TRUE)
+
+## lage prosess control fig
+
+## save file generic
+fig1 <- fig5
+filnavn <- "prosessControlROSC"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL

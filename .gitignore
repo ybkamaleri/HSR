@@ -62,3 +62,4 @@ Thumbs.db
 *.pdf
 /rapport2016/datakilder01.R
 *.png
+*.Rds

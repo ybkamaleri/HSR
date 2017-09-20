@@ -1,3 +1,4 @@
+
 ## Hjertestansreg.
 rm(list = ls())
 
@@ -420,7 +421,7 @@ library(qicharts2)
 
 ## exclude Norge (gjennonsnitt) og N < 6
 pcROSC <- roscAlle[ReshNavn != "Norge"] #tar bort Norge
-pcROSC <- pcROSC[pros != 0]
+pcROSC <- pcROSC[!is.na(N)]
 pcROSC$ReshNavn <- factor(pcROSC$ReshNavn, levels = pcROSC$ReshNavn[order(-pcROSC$sum)])
 
 

@@ -74,6 +74,11 @@ regGender <- reg[, .N, by = list(ReshNavn, gender)]
 ##############################
 ## Alder ved HS hendelse
 
+## hente bare dato ved hendelse
+regdata[, henddato := as.Date(format(as.POSIXct(DatoogtidhenvedelsemottatAMK, format = "%Y-%m-%d %H:%M"), "%Y-%m-%d"))]
+## alder ved hendelse
+regdata[, agehs := floor(difftime(henddato, fdato, units = "days")/365.25)]
+
 
 
 

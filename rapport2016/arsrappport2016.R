@@ -22,9 +22,9 @@ data.value <- setDT(data.value)
 ## names(data.value)
 ## View(regdata)
 
-reshID <- levels(data.value$ReshId_v)
-reshID <- iconv(reshID, "latin1", "utf-8") #konvertere til utf-8
-regdata[, ReshNavn := ReshId][, setattr(ReshNavn, "levels", reshID)]
+## reshID <- levels(data.value$ReshId_v)
+## reshID <- iconv(reshID, "latin1", "utf-8") #konvertere til utf-8
+## regdata[, ReshNavn := ReshId][, setattr(ReshNavn, "levels", reshID)]
 
 
 
@@ -46,6 +46,10 @@ savefig <- "~/Git-work/HSR/rapport2016/fig"
 ## Analyser
 ##############
 
+## Convert to utf-8 for HF navn
+regdata$ReshNavn <- iconv(regdata$ReshNavn, 'latin1', 'utf-8')
+
+
 ## Antall per ReshID
 regdata[, .N, by = list(ReshId, ReshNavn)]
 
@@ -61,10 +65,15 @@ regHF <- reg[, .N, by = list(ReshId, ReshNavn)]
 reg[, gender := PatientGender]
 reg$gender <- factor(reg$gender,
                      levels = c(1, 2),
-                            labels = c("mann", "kvinne"))
+                     labels = c("mann", "kvinne"))
 
 ## Antall per HF og kjønn
 regGender <- reg[, .N, by = list(ReshNavn, gender)]
+
+
+##############################
+## Alder ved HS hendelse
+
 
 
 
@@ -427,10 +436,10 @@ pcROSC$ReshNavn <- factor(pcROSC$ReshNavn, levels = pcROSC$ReshNavn[order(-pcROS
 
 fig5 <- qic(x = ReshNavn, y = N,
             n = sum,
-              data = pcROSC,
-              chart = 'p',
-              y.percent = TRUE,
-              title = "",
+            data = pcROSC,
+            chart = 'p',
+            y.percent = TRUE,
+            title = "",
             ylab = "",
             xlab = "",
             flip = TRUE)

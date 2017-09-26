@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 ##################
 ## Calculate age https://github.com/jknowles/eeptools/blob/master/R/age_calc.R
 ##################
-=======
-#########################
-## Calculate age
-#########################
->>>>>>> 2de0162b363161c72090f01b1d7e021d7fdfc5c3
 
 age_calc <- function(dob, enddate=Sys.Date(), units='months', precise=TRUE){
   if (!inherits(dob, "Date") | !inherits(enddate, "Date")){

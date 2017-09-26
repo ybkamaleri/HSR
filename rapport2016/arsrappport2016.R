@@ -133,6 +133,12 @@ dev.off()
 ##################
 ## Pyramid figure age and kjønn
 
+ageGender <- reg[, .N, by = list(ageKat, gender)]
+ageGender <- na.omit(ageGender, cols = "ageKat") #remove NA
+
+ggplot(ageGender, aes(x = ageKat, color = gender)) +
+  geom_linerange(data = ageGender[ageGender$gender == "mann", ],
+                 aes(ymin = -0.3, ymax = -0.3 + N))
 
 
 

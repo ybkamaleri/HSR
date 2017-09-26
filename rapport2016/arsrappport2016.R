@@ -82,6 +82,15 @@ regGender <- reg[, .N, by = list(ReshNavn, gender)]
 ###########################################
 ## Pasients alder ved hendelse mottatt AMK
 
+## hente bare dato ved hendelse
+regdata[, henddato := as.Date(format(as.POSIXct(DatoogtidhenvedelsemottatAMK, format = "%Y-%m-%d %H:%M"), "%Y-%m-%d"))]
+## alder ved hendelse
+regdata[, agehs := floor(difftime(henddato, fdato, units = "days")/365.25)]
+
+
+#######################################
+## Pasients alder
+
 ## Konvertere til numeric
 nr <- "ageamk"
 for (i in seq_along(nr)) {

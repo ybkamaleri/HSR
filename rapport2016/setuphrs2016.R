@@ -73,10 +73,6 @@ age_calc <- function(dob, enddate=Sys.Date(), units='months', precise=TRUE){
   return(result)
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 2de0162b363161c72090f01b1d7e021d7fdfc5c3
 ###########################
 ##  Alder del i kategorier
 ###########################
@@ -146,6 +142,8 @@ col1 <- "#6DAED6" # #28f
 cols <- c("#c6dbef", "#6baed6","#4292c6", "#2171b5", "#084594", "#000059")
 col2 <- c("#6baed6","#0845ff")
 col4 <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
+colb1 <- "#6baed6"
+colb2 <- "#0845ff"
 
 ## Telling HF
 telling <- function(data, by1 , by2) {

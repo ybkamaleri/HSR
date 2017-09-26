@@ -84,8 +84,13 @@ regGender <- reg[, .N, by = list(ReshNavn, gender)]
 ## hente bare dato ved hendelse
 regdata[, henddato := as.Date(format(as.POSIXct(DatoogtidhenvedelsemottatAMK, format = "%Y-%m-%d %H:%M"), "%Y-%m-%d"))]
 ## alder ved hendelse
+
 regdata[, agehs := floor(difftime(henddato, fdato, units = "days")/365.25)]
 
+## Another way to calculate age
+regdata[, henddato1 := as.numeric(gsub("-", "", henddato))]
+regdata[, fdato1 := as.numeric(gsub("-", "", fdato))]
+regdata[, ageFrode := as.numeric((henddato1 - fdato1) / 10000)]
 
 #######################################
 ## Pasients alder
@@ -109,7 +114,7 @@ regAge[, pos := ifelse(N > 30, 1, 0)]
 regAge[pos == 1, txtpos := N - 0.03 * max(N)] #text position inside bar
 regAge[pos == 0, txtpos := N + (0.2 * max(N))] #text position outside bar
 
-title <- paste0("Aldersfordeling", " (N=", ageN, ")")
+figTitle <- paste0("Aldersgrupper", " (N=", ageN, ")")
 
 ## Figure Age categories
 ageAlle <- ggplot(regAge, aes(ageKat, N)) +
@@ -117,7 +122,7 @@ ageAlle <- ggplot(regAge, aes(ageKat, N)) +
   geom_text(aes(x = ageKat, y = txtpos, label = N), size = 3) +
   ## geom_text(data = regAge[pos == 1], aes(x = ageKat, y = N - 10, label = N), size = 3) +
   ## geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
-  labs(title = title, y = "Antall pasienter", x = "Pasientens alder") +
+  labs(title = figTitle, y = "Antall pasienter", x = "Pasientens alder") +
   scale_y_continuous(expand = c(0,0)) +
   coord_flip() +
   theme3
@@ -130,22 +135,71 @@ cowplot::save_plot("~/Git-work/HSR/rapport2016/fig/Alder.pdf", figAge1, base_hei
 grid.draw(ageAlle)
 dev.off()
 
-##################
+################################
 ## Pyramid figure age and kjønn
 
 ageGender <- reg[, .N, by = list(ageKat, gender)]
 ageGender <- na.omit(ageGender, cols = "ageKat") #remove NA
 
-ggplot(ageGender, aes(x = ageKat, color = gender)) +
+ageGender[, fign := ifelse(gender == "mann", N * -1, N)] #lage negative value for menn (som skal være RHS)
+
+figTitle <- "Antall pasienter fordelt på aldersgrupper og kjønn"
+gap <- 20 #the gap for text btw the figures
+rownr <- dim(ageGender)[1] / 2 #antall row for each gender
+nman <- sum(ageGender$N[ageGender$gender == "mann"])
+nwomen <- sum(ageGender$N[ageGender$gender == "kvinne"])
+
+figgender <- ggplot(ageGender, aes(x = ageKat, color = gender)) +
   geom_linerange(data = ageGender[ageGender$gender == "mann", ],
-                 aes(ymin = -0.3, ymax = -0.3 + N))
+                 aes(ymin = -gap, ymax = -gap + fign), size = 7) +
+  geom_linerange(data = ageGender[ageGender$gender == "kvinne", ],
+                 aes(ymin = gap, ymax = gap + fign), size = 7) +
+  ## geom_text(data = ageGender[ageGender$gender == "mann", ],
+  ##           aes(x = ageKat, y = fign + (-gap), label = N), color = "black") +
+  geom_label(aes(x = ageKat, y = 0, label = ageKat),
+             inherit.aes = FALSE,
+             size = 4, label.padding = unit(0.0, "lines"), label.size = 0,
+             label.r = unit(0.0, "lines"), fill = "#EFF2F4", color = "black", size = 2) +
+coord_flip() +
+  scale_y_continuous(breaks = c(c(-200, -150, -100, -50, 0) + -gap,
+                                c(0, 50, 100, 150, 200) + gap),
+                     labels =  c(c("200", "150", "100", "50", "0", "0", "50", "100", "150", "200"))) +
+  scale_color_manual(name = "", values = c(mann = colb1, kvinne = colb2)) +
+  labs(title = figTitle, y = "", x = "") +
+  annotate("text", x = rownr + 1, y = -gap + (-40), label = paste0("Mann (N=", nman, ")")) +
+  annotate("text", x = rownr + 1, y = gap + 45, label = paste0("Kvinne (N=", nwomen, ")")) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(linetype = "dotted", size = 0.5, color = "grey"),
+    axis.text.x = element_text(size = 12, color = "black"),
+    axis.text.y = element_blank(),
+    plot.margin = unit(c(1, 1, 1, 1), "cm"),
+    legend.position = "none"
+
+  )
 
 
+## save file generic
+fig1 <- figgender
+fileTitle <- "AgeGender"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", fileTitle, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", fileTitle, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
 
 
-
-
-
+################################
 ## Mean age med HF
 ageHF <- reg[, list(mean = mean(get(nr), na.rm = TRUE),
                     n = .N,
@@ -166,7 +220,7 @@ ageAlle[, ypos := 0.06 * max(mean)]
 title <- " "
 
 fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
-    geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
   geom_text(data = ageAlle[ReshNavn != "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
   geom_text(data = ageAlle[ReshNavn == "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5, color = "white") +
   ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
@@ -273,7 +327,8 @@ norge <- reg[, .N, by = .(kollaps)]
 norge[, sum := sum(N)]
 norge[, ReshId := 99999]
 norge[, ReshNavn := (nor)]
-norge[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
+## norge[, pros := as.numeric(format(round(N / sum * 100), nsmall = 0))]
+norge[, pros := as.numeric(round(N / sum * 100))]
 
 ### Kombinere begge datasett
 kollalle <- rbindlist(list(kollHF, norge), use.names = TRUE)
@@ -292,27 +347,41 @@ kollper <- kollalle[kollaps == 1]
 ## bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
 ## kollperfig <- kollper[ReshId %in% (bortHF)]
 
-title <- " "
+figtitle <- ""
 ylab <- "Prosent (%)"
 
 ## text position
 kollper[, ypos := pros + (0.05 * max(pros))]
 
-## N < 5 gi prosent == 0
-kollperfig <- kollper[, pros := ifelse(N < 6, 0, pros)]
 
-fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
+fig3 <- ggplot(kollper, aes(x=reorder(fig, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-  geom_text(data = kollperfig[N > 5], aes(y = ypos, label = pros), size = 3.5) +
-  geom_text(data = kollperfig[N < 6], aes(y = 1.5, label = "n<6"), size = 3.5) +
-  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
-  ##               position = position_dodge(.9)) +
+  geom_text(aes(y = ypos, label = pros), size = 3.5) +
   coord_flip() +
   ##guides(fill = FALSE) +
-  labs(title = "", y = ylab) +
+  labs(title = figtitle, y = ylab) +
   scale_fill_manual(values = col2, guide = 'none') +
   scale_y_continuous(expand = c(0,0)) +
   theme2
+
+
+
+###### If annonimizing to be done
+## ## N < 5 gi prosent == 0
+## kollperfig <- kollper[, pros := ifelse(N < 6, 0, pros)]
+
+## fig3 <- ggplot(kollperfig, aes(x=reorder(fig, pros), y = pros)) +
+##   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+##   geom_text(data = kollperfig[N > 5], aes(y = ypos, label = pros), size = 3.5) +
+##   geom_text(data = kollperfig[N < 6], aes(y = 1.5, label = "n<6"), size = 3.5) +
+##   ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+##   ##               position = position_dodge(.9)) +
+##   coord_flip() +
+##   ##guides(fill = FALSE) +
+##   labs(title = "", y = ylab) +
+##   scale_fill_manual(values = col2, guide = 'none') +
+##   scale_y_continuous(expand = c(0,0)) +
+##   theme2
 
 ## ## Add notes
 ## library(grid)

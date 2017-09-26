@@ -50,6 +50,20 @@ savefig <- "~/Git-work/HSR/rapport2016/fig"
 regdata$ReshNavn <- iconv(regdata$ReshNavn, 'latin1', 'utf-8')
 
 
+## "DatoogtidhenvendelsemottatAMK" exclude time
+amk <- grep("mottatAMK$", names(regdata), value = TRUE)
+regdata[, dateamk := as.IDate(format(as.POSIXct(get(amk), format = "%Y-%m-%d %H:%M:%S"), "%Y-%m-%d"))]
+
+## Create AGE from "fdato" and "dateamk"
+regdata[, ageamk := round(floor(difftime(dateamk, fdato, units = "days")) / 365.25)]
+
+## Value for Kjønn
+regdata[, gender := PatientGender]
+regdata$gender <- factor(regdata$gender,
+                         levels = c(1, 2),
+                         labels = c("mann", "kvinne"))
+
+
 ## Antall per ReshID
 regdata[, .N, by = list(ReshId, ReshNavn)]
 
@@ -61,50 +75,44 @@ totalN <- dim(reg)[1]
 ## Antall N per HF
 regHF <- reg[, .N, by = list(ReshId, ReshNavn)]
 
-## Kjønn
-reg[, gender := PatientGender]
-reg$gender <- factor(reg$gender,
-                     levels = c(1, 2),
-                     labels = c("mann", "kvinne"))
-
 ## Antall per HF og kjønn
 regGender <- reg[, .N, by = list(ReshNavn, gender)]
 
 
-##############################
-## Alder ved HS hendelse
-
-
-
-
-#######################################
-## Pasients alder
+###########################################
+## Pasients alder ved hendelse mottatt AMK
 
 ## Konvertere til numeric
-nr <- c("PatientAge")
+nr <- "ageamk"
 for (i in seq_along(nr)) {
   set(reg, i = NULL, j = nr[i], value = as.numeric(reg[[nr[i]]]))
 }
 
 ## alder.kat funksjon lages i setup
-reg[, ageKat := alder.kat(PatientAge, 0, 100, 5)]
+reg[, ageKat := alder.kat(get(nr), 0, 100, 5)]
 regAge <- reg[, .N, by = .(ageKat)]
+regAge <- na.omit(regAge, cols = "ageKat") #exclude NA
+ageN <- sum(regAge$N) #sum exclude NA
+ageNA <- reg[is.na(fdato), .N] #sum NA fdato
 
 
-## Position for text when N > 40
-regAge[, pos := ifelse(N > 40, 1, 0)]
+## Position for text when N > 30
+regAge[, pos := ifelse(N > 30, 1, 0)]
+regAge[pos == 1, txtpos := N - 0.03 * max(N)] #text position inside bar
+regAge[pos == 0, txtpos := N + (0.2 * max(N))] #text position outside bar
 
-title <- " "
+title <- paste0("Aldersfordeling", " (N=", ageN, ")")
 
 ## Figure Age categories
-  ageAlle <- ggplot(regAge, aes(ageKat, N)) +
-    geom_bar(stat='identity', fill = col1) +
-    geom_text(data = regAge[pos == 1], aes(x = ageKat, y = N - 10, label = N), size = 3) +
-    geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
-    labs(title = title, y = "Antall pasienter", x = "Pasientens alder") +
-    scale_y_continuous(expand = c(0,0)) +
-    coord_flip() +
-    theme3
+ageAlle <- ggplot(regAge, aes(ageKat, N)) +
+  geom_bar(stat='identity', fill = col1) +
+  geom_text(aes(x = ageKat, y = txtpos, label = N), size = 3) +
+  ## geom_text(data = regAge[pos == 1], aes(x = ageKat, y = N - 10, label = N), size = 3) +
+  ## geom_text(data = regAge[pos == 0], aes(x = ageKat, y = N + 5, label = N), size = 3) +
+  labs(title = title, y = "Antall pasienter", x = "Pasientens alder") +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_flip() +
+  theme3
 
 
 figAge1 <- ggplot_gtable(ggplot_build(ageAlle))
@@ -114,17 +122,25 @@ cowplot::save_plot("~/Git-work/HSR/rapport2016/fig/Alder.pdf", figAge1, base_hei
 grid.draw(ageAlle)
 dev.off()
 
+##################
+## Pyramid figure age and kjønn
+
+
+
+
+
+
 
 
 ## Mean age med HF
-ageHF <- reg[, list(mean = mean(PatientAge),
+ageHF <- reg[, list(mean = mean(get(nr), na.rm = TRUE),
                     n = .N,
-                    sd = sd(PatientAge)), by = ReshNavn]
+                    sd = sd(get(nr), na.rm = TRUE)), by = ReshNavn]
 ## Norge
-ageN <- reg[, .( mean = mean(PatientAge),
+ageN <- reg[, .( mean = mean(get(nr), na.rm = TRUE),
                 ReshNavn = "Norge",
                 n = .N,
-                sd = sd(PatientAge))]
+                sd = sd(get(nr), na.rm = TRUE))]
 
 ## Merge both
 ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)

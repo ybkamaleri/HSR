@@ -31,8 +31,8 @@ data.value <- setDT(data.value)
 ## Felles funksjon
 
 library('ggplot2')
-library('dplyr')
-library('tidyr')
+## library('dplyr')
+## library('tidyr')
 library('gridExtra')
 library('grid')
 library('cowplot')
@@ -156,14 +156,14 @@ figgender <- ggplot(ageGender, aes(x = ageKat, color = gender)) +
                  aes(ymin = gap, ymax = gap + fign), size = 7) +
   ## geom_text(data = ageGender[ageGender$gender == "mann", ],
   ##           aes(x = ageKat, y = fign + (-gap), label = N), color = "black") +
-  geom_label(aes(x = ageKat, y = 0, label = ageKat),
-             inherit.aes = FALSE,
-             size = 4, label.padding = unit(0.0, "lines"), label.size = 0,
-             label.r = unit(0.0, "lines"), fill = "#EFF2F4", color = "black", size = 2) +
-coord_flip() +
-  scale_y_continuous(breaks = c(c(-200, -150, -100, -50, 0) + -gap,
-                                c(0, 50, 100, 150, 200) + gap),
-                     labels =  c(c("200", "150", "100", "50", "0", "0", "50", "100", "150", "200"))) +
+  ## geom_label(aes(x = ageKat, y = 0, label = ageKat),
+  ##            inherit.aes = FALSE,
+  ##            size = 4) +
+  geom_text(aes(x = ageKat, y = 0, label = ageKat), inherit.aes = FALSE) +
+  coord_flip() +
+  scale_y_continuous(breaks = c(c(-250, -200, -150, -100, -50, 0) + -gap,
+                                c(0, 50, 100, 150, 200, 250) + gap),
+                     labels =  c(c("250", "200", "150", "100", "50", "0", "0", "50", "100", "150", "200", "250"))) +
   scale_color_manual(name = "", values = c(mann = colb1, kvinne = colb2)) +
   labs(title = figTitle, y = "", x = "") +
   annotate("text", x = rownr + 1, y = -gap + (-40), label = paste0("Mann (N=", nman, ")")) +
@@ -178,7 +178,6 @@ coord_flip() +
     axis.text.y = element_blank(),
     plot.margin = unit(c(1, 1, 1, 1), "cm"),
     legend.position = "none"
-
   )
 
 

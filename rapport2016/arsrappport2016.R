@@ -1,4 +1,3 @@
-
 ## Hjertestansreg.
 rm(list = ls())
 

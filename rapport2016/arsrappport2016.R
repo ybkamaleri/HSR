@@ -86,21 +86,13 @@ regdata$gender <- factor(regdata$gender,
                          labels = c("mann", "kvinne"))
 
 
-## Incidence person-year
-## Calculate number of days from 01.01.2017 to hendelse date
-## regdata[, intid := as.numeric(difftime(as.IDate("2016-01-01"), dateamk, units="days"))]
-
-regdata[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), as.IDate(regdata$dateamk), units = "years"))]
-## regdata[, inyear := intid / 365]
-
 
 ### Antall befolkning
 bfolk <- fread("~/Dropbox/OUS/HSR/Rapport2016/befolkning2016.csv", dec = ",")
 regdata <- merge(regdata, bfolk, by.x = "ReshNavn", by.y = "V1")
 
-setnames(regdata, old = "V2", new = "pop")
+setnames(regdata, old = "V2", new = "pop") #change var name to pop - population
 regdata[, unique(pop), by = ReshNavn]
-
 
 ## Antall per ReshID
 regdata[, .N, by = list(ReshId, ReshNavn)]
@@ -113,12 +105,65 @@ reg <- regdata[AnyBystander_CPR == 1 | HLRvedakuttmedisinskpersonell == 0,]
 ## Antall pasienter
 totalN <- dim(reg)[1]
 
-## Antall N per HF
-regHF <- reg[, .N, by = list(ReshId, ReshNavn)]
+####################################
+#### Background analysis ###########
+####################################
+
+## Antall N per HF og total populasjon
+regHF <- reg[, list(n = .N,
+                    pop = unique(pop)),
+             by = list(ReshId, ReshNavn)]
 
 ## Antall per HF og kjønn
 regGender <- reg[, .N, by = list(ReshNavn, gender)]
 
+
+###########################
+## Incidence person-year
+## ========================
+## Calculate number of days from 01.01.2017 to hendelse date
+## regdata[, intid := as.numeric(difftime(as.IDate("2016-01-01"), dateamk, units="days"))]
+
+reg[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), dateamk, units = "years"))]
+## regdata[, inyear := intid / 365]
+
+## count person-year before cardiac arrest (healthy time before attack) and number of cases by HF
+indata <- reg[, list(nyear = sum(indyear),
+                     n = .N,
+                     pop = unique(pop)
+                     ),
+              by = list(ReshId, ReshNavn)]
+
+indata[, ReshId := as.numeric(ReshId)]
+## how long the data has been collected i.e 0.8 = 8 month and 1.0 = 1 year
+indata[,  year := ifelse(ReshId == 601047, 0.8, 1.0)]
+
+indata[, poph := pop - n]
+
+indata[, nhealthyear := ((pop - n) * year) + nyear] #healthy year including healthy year for cases
+
+proph <- "nhealthyear"
+indata[, cprop := n / get(proph)]
+## Cases per 100000
+indata[, case := cprop * 100000] #cases per 100000
+
+## incidence rate with lower and upper bounds
+prop <- "cprop"
+## with continuity correction
+indata[, `:=` (lbw = ((get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) - ( 0.5 / get(proph))) * 100000)] #lower bound
+indata[, `:=` (ubw = ((get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) + ( 0.5 / get(proph))) * 100000)] #upper bound
+## without continuity correction
+indata[, `:=` (lb = (get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+indata[, `:=` (ub = (get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+## ## without continuity correction 99%
+## indata[, `:=` (lb99 = (get(prop) - 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+## indata[, `:=` (ub99 = (get(prop) + 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+
+## reduce digits showed
+indatacol <- names(indata)[10:16]
+for (var in indatacol) {
+  set(indata, i = NULL, j = var, value = round(indata[[var]], digits = 2))
+}
 
 #######################################
 ## Pasients alder

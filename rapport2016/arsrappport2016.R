@@ -86,6 +86,22 @@ regdata$gender <- factor(regdata$gender,
                          labels = c("mann", "kvinne"))
 
 
+## Incidence person-year
+## Calculate number of days from 01.01.2017 to hendelse date
+## regdata[, intid := as.numeric(difftime(as.IDate("2016-01-01"), dateamk, units="days"))]
+
+regdata[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), as.IDate(regdata$dateamk), units = "years"))]
+## regdata[, inyear := intid / 365]
+
+
+### Antall befolkning
+bfolk <- fread("~/Dropbox/OUS/HSR/Rapport2016/befolkning2016.csv", dec = ",")
+regdata <- merge(regdata, bfolk, by.x = "ReshNavn", by.y = "V1")
+
+setnames(regdata, old = "V2", new = "pop")
+regdata[, unique(pop), by = ReshNavn]
+
+
 ## Antall per ReshID
 regdata[, .N, by = list(ReshId, ReshNavn)]
 

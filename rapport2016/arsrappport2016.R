@@ -49,12 +49,35 @@ savefig <- "~/Git-work/HSR/rapport2016/fig"
 regdata$ReshNavn <- iconv(regdata$ReshNavn, 'latin1', 'utf-8')
 
 
+
+###########################################
+## Pasients alder basert på personnr og tiddato hendelse mottatt av AMK
+
 ## "DatoogtidhenvendelsemottatAMK" exclude time
-amk <- grep("mottatAMK$", names(regdata), value = TRUE)
-regdata[, dateamk := as.IDate(format(as.POSIXct(get(amk), format = "%Y-%m-%d %H:%M:%S"), "%Y-%m-%d"))]
+amk <- grep("mottatAMK$", names(regdata), value = TRUE) #grep colnames
+regdata[, dateamk := as.IDate(format(as.POSIXct(get(amk), format = "%Y-%m-%d %H:%M:%S"), "%Y-%m-%d"))] #henter bare dato
 
 ## Create AGE from "fdato" and "dateamk"
-regdata[, ageamk := round(floor(difftime(dateamk, fdato, units = "days")) / 365.25)]
+## 'fdato' hentes allerede fra personnr
+regdata[, ageamk := age(fdato, dateamk)] #bruk function age(from,to)
+
+## ## Another way to calculate age
+## ## 1
+## regdata[, ageamk := round(floor(difftime(dateamk, fdato, units = "days")) / 365.25)]
+
+## ## hente bare dato ved hendelse
+## regdata[, henddato := as.Date(format(as.POSIXct(DatoogtidhenvedelsemottatAMK, format = "%Y-%m-%d %H:%M"), "%Y-%m-%d"))]
+## ## alder ved hendelse
+
+## ## 2
+## regdata[, agehs := floor(difftime(henddato, fdato, units = "days")/365.25)]
+
+## ## 3
+## regdata[, henddato1 := as.numeric(gsub("-", "", henddato))]
+## regdata[, fdato1 := as.numeric(gsub("-", "", fdato))]
+## regdata[, ageFrode := as.numeric((henddato1 - fdato1) / 10000)]
+
+
 
 ## Value for Kjønn
 regdata[, gender := PatientGender]
@@ -66,7 +89,10 @@ regdata$gender <- factor(regdata$gender,
 ## Antall per ReshID
 regdata[, .N, by = list(ReshId, ReshNavn)]
 
-## Filteret dataset
+###########################
+## Filteret data REG
+###########################
+
 reg <- regdata[AnyBystander_CPR == 1 | HLRvedakuttmedisinskpersonell == 0,]
 ## Antall pasienter
 totalN <- dim(reg)[1]
@@ -77,20 +103,6 @@ regHF <- reg[, .N, by = list(ReshId, ReshNavn)]
 ## Antall per HF og kjønn
 regGender <- reg[, .N, by = list(ReshNavn, gender)]
 
-
-###########################################
-## Pasients alder ved hendelse mottatt AMK
-
-## hente bare dato ved hendelse
-regdata[, henddato := as.Date(format(as.POSIXct(DatoogtidhenvedelsemottatAMK, format = "%Y-%m-%d %H:%M"), "%Y-%m-%d"))]
-## alder ved hendelse
-
-regdata[, agehs := floor(difftime(henddato, fdato, units = "days")/365.25)]
-
-## Another way to calculate age
-regdata[, henddato1 := as.numeric(gsub("-", "", henddato))]
-regdata[, fdato1 := as.numeric(gsub("-", "", fdato))]
-regdata[, ageFrode := as.numeric((henddato1 - fdato1) / 10000)]
 
 #######################################
 ## Pasients alder
@@ -481,14 +493,14 @@ roscAlle[, pros := lapply(.SD, function(x) as.integer(x)), .SDcol = "pros"]
 ## text position
 roscAlle[, ypos := pros + (0.05 * max(pros))]
 
-## ta bort cases < 6
-roscAlle1 <- roscAlle[, pros := ifelse(N < 6, 0, pros)]
-roscAlle1 <- roscAlle[, pros := ifelse(is.na(pros), 0, pros)]#when NA
+## ## ta bort cases < 6
+## roscAlle1 <- roscAlle[, pros := ifelse(N < 6, 0, pros)]
+## roscAlle1 <- roscAlle[, pros := ifelse(is.na(pros), 0, pros)]#when NA
 
-fig4 <- ggplot(roscAlle1, aes(x=reorder(ReshTxt, pros), y = pros)) +
+fig4 <- ggplot(roscAlle, aes(x=reorder(ReshTxt, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-  geom_text(data = roscAlle1[pros != 0], aes(y = ypos, label = pros), size = 3.5) +
-  geom_text(data = roscAlle1[pros == 0], aes(y = 0.05 * max(roscAlle1$pros), label = "n<6")) +
+  geom_text(data = roscAlle[pros != 0], aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = roscAlle[pros == 0], aes(y = 0.05 * max(roscAlle$pros), label = "n<6")) +
   ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
   ##               position = position_dodge(.9)) +
   coord_flip() +
@@ -508,7 +520,7 @@ fig4 <- ggplot(roscAlle1, aes(x=reorder(ReshTxt, pros), y = pros)) +
 
 ## save file generic
 fig1 <- fig4
-filnavn <- "ROSC"
+filnavn <- "UtsteinROSC"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
@@ -546,7 +558,7 @@ fig5 <- qic(x = ReshNavn, y = N,
 
 ## save file generic
 fig1 <- fig5
-filnavn <- "prosessControlROSC"
+filnavn <- "UtsteinROSC_pc"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
@@ -559,3 +571,57 @@ dev.off()
 
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
+
+
+##########################################
+## Incidence
+##########################################
+
+data2 <- fread("~/Dropbox/OUS/HSR/Rapport2016/forekomst2016.csv", dec = ",") #replace "," used in the dataset with "."
+
+## give coloumn names
+setnames(data2, c("hf", "pop", "hendelse", "year", "personyr", "per100tusen", "kollasp_tilstd", "in_koltilstd", "koll_medper", "in_kollper"))
+
+
+###
+## Function calculate CI prop
+
+## lower bound
+proplb <- function(n, p, z=1.96, cc=TRUE){
+  out <- list()
+  if(cc){
+    out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
+    out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
+  } else {
+    out$lb <- p - z*sqrt((p*(1-p))/n)
+    out$ub <- p + z*sqrt((p*(1-p))/n)
+  }
+  out$lb
+}
+
+## upper bound
+propub <- function(n, p, z=1.96, cc=TRUE){
+  out <- list()
+  if(cc){
+    out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
+    out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
+  } else {
+    out$lb <- p - z*sqrt((p*(1-p))/n)
+    out$ub <- p + z*sqrt((p*(1-p))/n)
+  }
+  out$ub
+}
+
+
+### Convert to numeric
+colnum = c("personyr", "per100tusen")
+
+for (i in seq_along(colnum)) {
+  set(data2, i = NULL, j = colnum[i], value = as.numeric(data2[[colnum[i]]]))
+}
+
+data2[, prop := hendelse / personyr]
+data2[, prop104 := prop * 10000]
+
+data2[, `:=` (lb = ((prop - 1.96 * sqrt(prop * (1 - prop)) / personyr) - ( 0.5 / personyr)) * 10000)]
+data2[, `:=` (ub = ((prop + 1.96 * sqrt(prop * (1 - prop)) / personyr) + ( 0.5 / personyr)) * 10000)]

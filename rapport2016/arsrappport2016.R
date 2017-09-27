@@ -159,6 +159,10 @@ indata[, `:=` (ub = (get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(
 ## indata[, `:=` (lb99 = (get(prop) - 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
 ## indata[, `:=` (ub99 = (get(prop) + 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
 
+## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
+indata[, irlb := (cprop - 1.96 * cprop / sqrt(n)) * 100000]
+indata[, irub := (cprop + 1.96 * cprop / sqrt(n)) * 100000]
+
 ## reduce digits showed
 indatacol <- names(indata)[10:16]
 for (var in indatacol) {

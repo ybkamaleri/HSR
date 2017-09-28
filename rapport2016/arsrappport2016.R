@@ -211,7 +211,7 @@ figinc <- ggplot(indata, aes(reorder(ReshNavn, ir), ir)) +
              fill = colb2,
              color = "white",
              fontface = "bold") +
-  labs(title = ftit, subtitle = fsub, y = xtit) +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
   coord_flip() +
   scale_y_continuous(breaks = xlabels) +
   theme2 +
@@ -355,83 +355,161 @@ ageHF <- reg[, list(mean = mean(get(nr), na.rm = TRUE),
                     n = .N,
                     sd = sd(get(nr), na.rm = TRUE)), by = ReshNavn]
 ## Norge
-  ageN <- reg[, .( mean = mean(get(nr), na.rm = TRUE),
-                  ReshNavn = "Norge",
-                  n = .N,
-                  sd = sd(get(nr), na.rm = TRUE))]
+ageN <- reg[, .( mean = mean(get(nr), na.rm = TRUE),
+                ReshNavn = "Norge",
+                n = .N,
+                sd = sd(get(nr), na.rm = TRUE))]
 
-  ## Merge both
-  ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)
-  ## alt. to use rbind if position for colnames not at the same position
+## Merge both
+ageAlle <- data.table::rbindlist(list(ageN, ageHF), use.names = TRUE)
+## alt. to use rbind if position for colnames not at the same position
 
-  ## Y text position
-  ageAlle[, ypos := 0.06 * max(mean)]
+## Y text position
+ageAlle[, ypos := 0.06 * max(mean)]
 
-  title <- " "
+title <- " "
 
-  fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
-    geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
-    geom_text(data = ageAlle[ReshNavn != "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5) +
-    geom_text(data = ageAlle[ReshNavn == "Norge"], aes(y = ypos, label = paste0(sprintf("%1.1f", mean))), size = 3.5, color = "white") +
-    ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
-    ##               position = position_dodge(.9)) +
-    coord_flip() +
-    ##guides(fill = FALSE) +
-    labs(title = title, y = "Gjennomsnitt alder") +
-    scale_fill_manual(values = col2, guide = 'none') +
-    scale_y_continuous(expand = c(0,0)) +
-    theme2
+fig1 <- ggplot(ageAlle, aes(x=reorder(ReshNavn, mean), y = mean)) +
+  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+  geom_text(data = ageAlle[ReshNavn != "Norge"], aes(y = ypos, label = sprintf("%1.1f", mean)), size = 3.5) +
+  geom_text(data = ageAlle[ReshNavn == "Norge"], aes(y = ypos, label = sprintf("%1.1f", mean)), size = 3.5, color = "white") +
+  ## geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),  width = .3, color = "blue",
+  ##               position = position_dodge(.9)) +
+  coord_flip() +
+  ##guides(fill = FALSE) +
+  labs(title = title, y = "Gjennomsnitt alder") +
+  scale_fill_manual(values = col2, guide = 'none') +
+  scale_y_continuous(expand = c(0,0)) +
+  theme2
 
-  fig1a <- ggplot_gtable(ggplot_build(fig1))
-  fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
-  grid.draw(fig1a)
-  cowplot::save_plot(paste(savefig, "AlderMean.jpg", sep = "/"), fig1a, base_height = 7, base_width = 7)
-  cowplot::save_plot(paste(savefig, "AlderMean.pdf", sep = "/"), fig1a, base_height = 7, base_width = 7)
-  ## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
-  dev.off()
-
-
-  ###############################
-  ## Kollaps hørt eller sett av
-  ###############################
-
-  ## if problem with locale when running "grep" then run this
-  Sys.setlocale(locale = "C")
-
-  koll <- grep("*rtellersettav$", colnames(reg), value = TRUE) #name
-
-  ## rename variable to 'kollaps'
-  reg[, kollaps := get(koll)]
-
-  ## set back locale to default
-  Sys.setlocale(locale = "")
-
-  ## recode 'ikke valgt' and 'Ukjent' to 999
-  reg[list(kollaps = c(-1, 999), to = 999), on = "kollaps", kollaps := i.to]
-
-  ## count for each category of kollaps
-  kollv <- reg[, list(n = .N),  by = kollaps]
-  ## Get prosent
-  kollv[, sum := sum(n)][, pro := as.numeric(format(round(n / sum * 100), nsmall = 0))] #ingen decimal
-  ## give value names
-  kollv$value <- factor(kollv$kollaps,
-                        levels = c(0, 1, 99, 999),
-                        labels = c("Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste(savefig, "AlderMean.jpg", sep = "/"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste(savefig, "AlderMean.pdf", sep = "/"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
 
 
-  ## ## Endre tilbake til norsk locale for å få norske bokstaver
-  ## Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
-  ## kollv$value <- iconv(kollv$value, "utf-8", "latin1")
+#############################
+## Årsak til hjertestans
+#############################
+
+kol2 <- grep("rsaktilhjertestans$", colnames(reg), value = TRUE) #var "årsaktilhjertestans"
+
+## rename to "why"
+reg[, whyhs := as.integer(get(kol2))]
+
+## recode 1=kardial og 2=annen  - ref https://stackoverflow.com/questions/44590935/recode-a-variable-using-data-table
+reg[, whyhs := sapply(whyhs, function(x){
+  ifelse(x != 0, 2, 1)
+
+})]
+
+## count reason for cardiac arrest pr HF
+whyhs <- reg[, .N, by = .(ReshNavn, whyhs)]
+## procent
+whyhs[, total := sum(N), by = .(ReshNavn)]
+whyhs[, pros := round((N / total) * 100, digits = 0)]
+
+## hele landet
+whynor <- reg[, .N, by = .(whyhs)][, ReshNavn := "Norge"]
+whynor[, total := sum(N)][, pros := round((N / total) * 100, digits = 0)]
+
+## Combine Norge and HF
+whyAll <- rbindlist(list(whyhs, whynor), use.names = TRUE)
+
+## include N in ReshNavn
+whyAll[, fig := paste0(ReshNavn, " (N=", total, ")")]
 
 
-  ## Lage figur ======================
+## Figure for Antatt kardial = 1
+whyfig <- whyAll[whyhs == 1, ]
 
-  ## include N in the value name
-  kollv[, fig:=paste0(value, " (N=", n, ")")]
+## ## ta bort HF med cases < 5
+## bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
+## kollperfig <- kollper[ReshId %in% (bortHF)]
 
-  title <- " "
-  ## text position
-  kollv[, ypos := pro + (0.05 * max(pro))]
+figtitle <- ""
+ylab <- "Prosent (%)"
+
+## text position
+whyfig[, ypos := pros - (0.05 * max(pros))]
+
+
+figwhy <- ggplot(whyfig, aes(x=reorder(fig, pros), y = pros)) +
+  geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
+  geom_text(aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = whyfig[whyfig$ReshNavn == "Norge"], aes(y = ypos, label = pros), size = 3.5, color = "white") +
+  coord_flip() +
+  ##guides(fill = FALSE) +
+  labs(title = figtitle, y = ylab) +
+  scale_fill_manual(values = col2, guide = 'none') +
+  scale_y_continuous(expand = c(0,0)) +
+  theme2
+
+
+## save file generic
+fig1 <- figwhy
+filnavn <- "anttattKardialTilHertestans"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", filnavn, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+
+
+
+###############################
+## Kollaps hørt eller sett av
+###############################
+
+## if problem with locale when running "grep" then run this
+Sys.setlocale(locale = "C")
+
+koll <- grep("*rtellersettav$", colnames(reg), value = TRUE) #name
+
+## rename variable to 'kollaps'
+reg[, kollaps := get(koll)]
+
+## set back locale to default
+Sys.setlocale(locale = "")
+
+## recode 'ikke valgt' and 'Ukjent' to 999
+reg[list(kollaps = c(-1, 999), to = 999), on = "kollaps", kollaps := i.to]
+
+## count for each category of kollaps
+kollv <- reg[, list(n = .N),  by = kollaps]
+## Get prosent
+kollv[, sum := sum(n)][, pro := as.numeric(format(round(n / sum * 100), nsmall = 0))] #ingen decimal
+## give value names
+kollv$value <- factor(kollv$kollaps,
+                      levels = c(0, 1, 99, 999),
+                      labels = c("Tilstedeværende", "Akuttmedisinsk personell", "Ingen", "Ukjent"))
+
+
+## ## Endre tilbake til norsk locale for å få norske bokstaver
+## Sys.setlocale("LC_ALL", "nb_NO.UTF-8")
+## kollv$value <- iconv(kollv$value, "utf-8", "latin1")
+
+
+## Lage figur ======================
+
+## include N in the value name
+kollv[, fig:=paste0(value, " (N=", n, ")")]
+
+title <- " "
+## text position
+kollv[, ypos := pro + (0.05 * max(pro))]
 
 fig2 <- ggplot(kollv, aes(fig, pro)) +
   geom_bar(stat = 'identity', fill = col1) +
@@ -488,7 +566,7 @@ kollalle[, fig := paste0(ReshNavn, " (N=", sum, ")")]
 
 
 ##########################========================
-## Kollaps sett av Helse personell
+## Figure for Kollaps sett av Helse personell
 
 ## keep only kollaps sett av Akuttmedisinskpersonnell = 1
 kollper <- kollalle[kollaps == 1]
@@ -497,16 +575,19 @@ kollper <- kollalle[kollaps == 1]
 ## bortHF <- kollper$ReshId[kollper$N >= 5] #beholder bare de over og lik 5
 ## kollperfig <- kollper[ReshId %in% (bortHF)]
 
+## title two lines
+## figtitle <- paste("Kollaps hørt eller sett", "av ambulansepersonell", sep = "\n")
 figtitle <- ""
 ylab <- "Prosent (%)"
 
 ## text position
-kollper[, ypos := pros + (0.05 * max(pros))]
+kollper[, ypos := pros - (0.05 * max(pros))]
 
 
 fig3 <- ggplot(kollper, aes(x=reorder(fig, pros), y = pros)) +
   geom_bar(stat = 'identity', aes(fill = ReshNavn == 'Norge')) +
   geom_text(aes(y = ypos, label = pros), size = 3.5) +
+  geom_text(data = kollper[kollper$ReshId == 99999], aes(y = ypos, label = pros), size = 3.5, color = "white") +
   coord_flip() +
   ##guides(fill = FALSE) +
   labs(title = figtitle, y = ylab) +

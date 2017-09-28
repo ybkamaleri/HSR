@@ -138,33 +138,37 @@ indata[, ReshId := as.numeric(ReshId)]
 ## how long the data has been collected i.e 0.8 = 8 month and 1.0 = 1 year
 indata[,  year := ifelse(ReshId == 601047, 0.8, 1.0)]
 
+## exposed population only
 indata[, poph := pop - n]
-
-indata[, nhealthyear := ((pop - n) * year) + nyear] #healthy year including healthy year for cases
+## person-year including healthy year for cases ie. before cardiac arrest
+indata[, nhealthyear := round(((pop - n) * year) + nyear, digits = 0)] #healthy year including healthy year for cases
 
 proph <- "nhealthyear"
-indata[, cprop := n / get(proph)]
-## Cases per 100000
-indata[, case := cprop * 100000] #cases per 100000
+indata[, cprop := n / get(proph)] #incident rate
+## Cases per 10000
+indata[, ir := cprop * 10000] #IR per 10000
 
 ## incidence rate with lower and upper bounds
 prop <- "cprop"
-## with continuity correction
-indata[, `:=` (lbw = ((get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) - ( 0.5 / get(proph))) * 100000)] #lower bound
-indata[, `:=` (ubw = ((get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) + ( 0.5 / get(proph))) * 100000)] #upper bound
-## without continuity correction
-indata[, `:=` (lb = (get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
-indata[, `:=` (ub = (get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
-## ## without continuity correction 99%
-## indata[, `:=` (lb99 = (get(prop) - 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
-## indata[, `:=` (ub99 = (get(prop) + 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+
+## ## with continuity correction
+## indata[, `:=` (lbw = ((get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) - ( 0.5 / get(proph))) * 100000)] #lower bound
+## indata[, `:=` (ubw = ((get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) + ( 0.5 / get(proph))) * 100000)] #upper bound
+## ## without continuity correction
+## indata[, `:=` (lb = (get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+## indata[, `:=` (ub = (get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+## ## ## without continuity correction 99%
+## ## indata[, `:=` (lb99 = (get(prop) - 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+## ## indata[, `:=` (ub99 = (get(prop) + 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
 
 ## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
-indata[, irlb := (cprop - 1.96 * cprop / sqrt(n)) * 100000]
-indata[, irub := (cprop + 1.96 * cprop / sqrt(n)) * 100000]
+## test the calculation here http://www.openepi.com/PersonTime1/PersonTime1.htm
+indata[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 10000] #lower limit
+indata[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 10000] #upper limit
 
 ## reduce digits showed
-indatacol <- names(indata)[10:16]
+nrvar <- dim(indata)[2]
+indatacol <- names(indata)[10:12]
 for (var in indatacol) {
   set(indata, i = NULL, j = var, value = round(indata[[var]], digits = 2))
 }

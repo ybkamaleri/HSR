@@ -86,8 +86,10 @@ regdata$gender <- factor(regdata$gender,
                          labels = c("mann", "kvinne"))
 
 
+#################################
+### Antall befolkning for vekting
+#################################
 
-### Antall befolkning
 bfolk <- fread("~/Dropbox/OUS/HSR/Rapport2016/befolkning2016.csv", dec = ",")
 regdata <- merge(regdata, bfolk, by.x = "ReshNavn", by.y = "V1")
 
@@ -118,14 +120,22 @@ regHF <- reg[, list(n = .N,
 regGender <- reg[, .N, by = list(ReshNavn, gender)]
 
 
-###########################
-## Incidence person-year
+####################################
+## person-year before cardiac arrest
 ## ========================
 ## Calculate number of days from 01.01.2017 to hendelse date
 ## regdata[, intid := as.numeric(difftime(as.IDate("2016-01-01"), dateamk, units="days"))]
 
 reg[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), dateamk, units = "years"))]
 ## regdata[, inyear := intid / 365]
+
+
+####== Generic data preparation stops here =====#####
+
+
+#####################################################
+## Incidence of cardiac arrest per 10,000 person-year - INDATA
+#####################################################
 
 ## count person-year before cardiac arrest (healthy time before attack) and number of cases by HF
 indata <- reg[, list(nyear = sum(indyear),
@@ -466,9 +476,6 @@ dev.off()
 fig1 <- NULL
 
 
-
-
-
 ###############################
 ## Kollaps hørt eller sett av
 ###############################
@@ -793,9 +800,121 @@ dev.off()
 fig1 <- NULL
 
 
-##########################################
-## Incidence
-##########################################
+
+###############################################
+## FILTER 2 - HLR ved akuttmedisinskpersonnell
+###############################################
+
+reg[, fil2 := as.numeric(reg$HLRvedakuttmedisinskpersonell)] #create new col for filter variable
+
+setindex(reg, NULL) #remove
+setindex(reg, fil2)
+
+## setkey(reg, fil2)
+## if setkey() is used then "on" isn't necessary for sorting temporarily. ie. setkey and on do the same thing
+filter2 <- reg[.(0), on = "fil2"] #select only "JA"
+
+
+####################
+### Vedvarende ROSC
+
+filter2[, rosc := ifelse(VedvarendeROSC == 0, 1, 2)] #recode JA to 1 else to 2
+
+roscHF <- filter2[, list(n = .N), by = list(rosc, ReshNavn, ReshId)]
+
+## percentage for rosc - ja and nei
+roscHF[, tot := sum(n), by =, (ReshId)][, pros := round((n / tot) * 100, digits = 0)]
+## proportion for rosc - ja vs nei
+roscHF[, del := n / tot] #proportion for calculating prop CI
+
+roscHF[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+roscHF[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+
+### Norge
+roscNo <- filter2[, list(n = .N), by = list(rosc)]
+roscNo[, ReshNavn := "Norge"][, tot := sum(n)][, pros := round(n / tot, digits = 0)][, del := n / tot]
+
+roscNo[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+roscNo[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+
+
+### Join the two HF and Norge
+
+roscAll <- rbindlist(list(roscHF, roscNo), use.names = TRUE, fill = TRUE) #fill use NA when missing col
+
+
+## include total number of patients in HF names
+roscAll[, ReshNr := paste0(ReshNavn, " (N=", tot, ")")]
+
+## When there is no cases of interest, this should be included as 0 case and 0 procent
+## columns to change value when pros is 0
+colrs <- c("n", "tot", "pros", "del", "ll", "ul")
+
+roscAll[pros == 100, (colrs) := 0] #replace all in colrs to 0
+roscAll[pros == 0, rosc := 1] #replace rosc to rosc JA ie. 1
+
+roscfig <- roscAll[rosc == 1]
+
+
+### Figure
+ftit <- "Andel pasienter med vedvarende egensirkulasjon (ROSC)"
+fsub <- "(95% konfidensintervall)"
+ytit <- "Andel pasienter med ROSC"
+xlabels <- seq(0, 100, 20)
+
+figrosc <- ggplot(roscfig, aes(reorder(ReshNr, pros), pros)) +
+  geom_errorbar(aes(ymax = ul, ymin = ll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = pros), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = roscfig[roscfig$ReshNavn == "Norge"], aes(label = pros), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figrosc
+title <- "vedvarendeROSC"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+
+
+################################################
+## Incidence based on Exel file
+## (THIS CALCULATION IS NOT USED IN THE REPORT)
+################################################
 
 data2 <- fread("~/Dropbox/OUS/HSR/Rapport2016/forekomst2016.csv", dec = ",") #replace "," used in the dataset with "."
 

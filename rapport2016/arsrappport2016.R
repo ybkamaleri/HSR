@@ -832,7 +832,8 @@ roscHF[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits 
 
 ### Norge
 roscNo <- filter2[, list(n = .N), by = list(rosc)]
-roscNo[, ReshNavn := "Norge"][, tot := sum(n)][, pros := round(n / tot, digits = 0)][, del := n / tot]
+roscNo[, ReshNavn := "Norge"][, tot := sum(n)]
+roscNo[, pros := round((n / tot) * 100, digits = 0)][, del := n / tot]
 
 roscNo[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
 roscNo[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
@@ -859,8 +860,8 @@ roscfig <- roscAll[rosc == 1]
 ### Figure
 ftit <- "Andel pasienter med vedvarende egensirkulasjon (ROSC)"
 fsub <- "(95% konfidensintervall)"
-ytit <- "Andel pasienter med ROSC"
-xlabels <- seq(0, 100, 20)
+ytit <- "Andel pasienter med ROSC (%)"
+xlabels <- seq(0, 100, 10)
 
 figrosc <- ggplot(roscfig, aes(reorder(ReshNr, pros), pros)) +
   geom_errorbar(aes(ymax = ul, ymin = ll), width = 0.25, size = 0.4) +

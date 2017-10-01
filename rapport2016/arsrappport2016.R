@@ -822,21 +822,31 @@ filter2[, rosc := ifelse(VedvarendeROSC == 0, 1, 2)] #recode JA to 1 else to 2
 
 roscHF <- filter2[, list(n = .N), by = list(rosc, ReshNavn, ReshId)]
 
+### Easy solution but have to find out better way to test that every HF should have rosc 1 and 2
+### if not then n = 0
+fin0 <- roscHF[ReshId == 601047]
+fin0[, rosc := 1][, n := 0]
+
+roscHF <- rbindlist(list(fin0, roscHF), use.names = TRUE)
+
+
+
+
 ## percentage for rosc - ja and nei
-roscHF[, tot := sum(n), by =, (ReshId)][, pros := round((n / tot) * 100, digits = 0)]
+roscHF[, tot := sum(n), by = .(ReshId)][, pros := round((n / tot) * 100, digits = 1)]
 ## proportion for rosc - ja vs nei
 roscHF[, del := n / tot] #proportion for calculating prop CI
 
-roscHF[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
-roscHF[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+roscHF[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 1)]
+roscHF[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 1)]
 
 ### Norge
 roscNo <- filter2[, list(n = .N), by = list(rosc)]
 roscNo[, ReshNavn := "Norge"][, tot := sum(n)]
-roscNo[, pros := round((n / tot) * 100, digits = 0)][, del := n / tot]
+roscNo[, pros := round((n / tot) * 100, digits = 1)][, del := n / tot]
 
-roscNo[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
-roscNo[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 0)]
+roscNo[, ll := round((del - 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 1)]
+roscNo[, ul := round((del + 1.96 * sqrt((del *( 1 - del)) / tot)) * 100, digits = 1)]
 
 
 ### Join the two HF and Norge
@@ -847,18 +857,19 @@ roscAll <- rbindlist(list(roscHF, roscNo), use.names = TRUE, fill = TRUE) #fill 
 ## include total number of patients in HF names
 roscAll[, ReshNr := paste0(ReshNavn, " (N=", tot, ")")]
 
-## When there is no cases of interest, this should be included as 0 case and 0 procent
-## columns to change value when pros is 0
-colrs <- c("n", "tot", "pros", "del", "ll", "ul")
+## ## When there is no cases of interest, this should be included as 0 case and 0 procent
+## ## columns to change value when pros is 0
+## colrs <- c("n", "tot", "pros", "del", "ll", "ul")
 
-roscAll[pros == 100, (colrs) := 0] #replace all in colrs to 0
-roscAll[pros == 0, rosc := 1] #replace rosc to rosc JA ie. 1
+## roscAll[pros == 100, (colrs) := 0] #replace all in colrs to 0
+## roscAll[pros == 0, rosc := 1] #replace rosc to rosc JA ie. 1
 
+## keep only rosc == 1 (JA)
 roscfig <- roscAll[rosc == 1]
 
 
 ### Figure
-ftit <- "Andel pasienter med vedvarende egensirkulasjon (ROSC)"
+ftit <- paste0("Andel pasienter med vedvarende", "\n", "egensirkulasjon (ROSC)")
 fsub <- "(95% konfidensintervall)"
 ytit <- "Andel pasienter med ROSC (%)"
 xlabels <- seq(0, 100, 10)
@@ -910,6 +921,113 @@ dev.off()
 fig1 <- NULL
 
 
+######################
+## Geom point and text
+figroscpoint <- ggplot(roscfig, aes(reorder(ReshNr, pros), pros)) +
+  geom_errorbar(aes(ymax = ul, ymin = ll), width = 0.25, size = 0.4) +
+  geom_point(size = 2.5, shape = 21, color = colb1, fill = colb1) +
+  geom_point(data = roscfig[roscfig$ReshNavn == "Norge"], size = 2.5, shape = 21, color = colb2, fill = colb2) +
+  geom_text(data = roscfig[roscfig$ReshNavn != "Norge"], aes(label = pros), size = 3,
+            vjust = -0.7, nudge_y = 0) +
+  geom_text(data = roscfig[roscfig$ReshNavn == "Norge"], aes(label = pros), size = 3,
+            vjust = -0.7, nudge_y = 0) +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+
+## save file generic
+fig1 <- figroscpoint
+title <- "vedvarendeROSCpoint"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+#####################
+## SPC ROSC
+
+npro2 <- roscNo$n[roscNo$rosc == 1] / sum(roscNo$n)
+
+## keep only relevant variables
+roscspc <- roscHF[, c(1:5)]
+roscspc[, p := npro2] #proportion defective for hele landet
+roscspc[, pros := (n / tot) * 100]
+
+## ## use function npro2 - for programming
+## roscspc[, slll := npro2 - 3 * (sqrt(npro2 * (1 - npro2)) / n)]
+
+roscspc[, sd := sqrt(p * (1 - p) / n)]
+roscspc[, ll := p - 3 * sd]
+roscspc[, ul := p + 3 * sd]
+roscspc[, llp := round(ll * 100, digits = 2)]
+roscspc[, ulp := round(ul * 100, digits = 2)]
+
+## if ll less than 0 then ll should be 0
+roscspc[ll < 0 | is.infinite(ll), ll := 0]
+## if ub infinite then should be 100
+roscspc[is.infinite(ul), ul := max(ul)]
+
+
+roscspc[, sll := round((p - 3 * (sqrt(p * (1 - p)) / n)) * 100, digits = 2)]
+roscspc[, sul := round((p + 3 * (sqrt(p * (1 - p)) / n)) * 100, digits = 2)]
+roscspc[, snitpro := round(p * 100, digits = 2)]
+
+
+
+
+## ## When there is no cases of interest, this should be included as 0 case and 0 procent
+## ## columns to change value when pros is 0
+## ncol <- dim(roscspc)[2]
+## col0 <- names(roscspc)[6:ncol]
+
+## roscspc[pros == 100, (col0) := 0] #replace all in colrs to 0
+## roscspc[pros == 0, rosc := 1] #replace rosc to rosc JA ie. 1
+## roscspc[pros == 0, n := 0] #if procent is 0 then n is 0
+
+## include total number of patients in HF names
+roscspc[, ReshNr := paste0(ReshNavn, " (N=", tot, ")")]
+
+## keep only rosc == 1
+roscspcfig <- roscspc[rosc == 1]
+
+## order ReshNr by n
+roscspcfig <- roscspcfig[, ReshNr := factor(ReshNr, levels = ReshNr[order(-n)])]
+## maxrow <- dim(roscspcfig)[1]
+## roscspcfig[, nr := 1:maxrow]
+spctest <- ggplot(roscspcfig, aes(ReshNr, pros))
+spctest + geom_ribbon(aes(ymin = llp, ymax = ulp), fill = "grey", color = "grey")+
+  geom_point() +
+  coord_flip()
+
+
+library(qicharts2)
+qic(x = ReshNr, y = n,
+    n = tot,
+    data = roscspcfig,
+    chart = 'p',
+    y.percent = TRUE,
+    title = "",
+    ylab = "",
+    xlab = "",
+    flip = TRUE)
+
 
 
 ################################################
@@ -920,24 +1038,24 @@ fig1 <- NULL
 data2 <- fread("~/Dropbox/OUS/HSR/Rapport2016/forekomst2016.csv", dec = ",") #replace "," used in the dataset with "."
 
 ## give coloumn names
-setnames(data2, c("hf", "pop", "hendelse", "year", "personyr", "per100tusen", "kollasp_tilstd", "in_koltilstd", "koll_medper", "in_kollper"))
+                  setnames(data2, c("hf", "pop", "hendelse", "year", "personyr", "per100tusen", "kollasp_tilstd", "in_koltilstd", "koll_medper", "in_kollper"))
 
 
-###
-## Function calculate CI prop
+                  ###
+                  ## Function calculate CI prop
 
-## lower bound
-proplb <- function(n, p, z=1.96, cc=TRUE){
-  out <- list()
-  if(cc){
-    out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
-    out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
-  } else {
-    out$lb <- p - z*sqrt((p*(1-p))/n)
-    out$ub <- p + z*sqrt((p*(1-p))/n)
-  }
-  out$lb
-}
+                  ## lower bound
+                  proplb <- function(n, p, z=1.96, cc=TRUE){
+                    out <- list()
+                    if(cc){
+                      out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
+                      out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
+                    } else {
+                      out$lb <- p - z*sqrt((p*(1-p))/n)
+                      out$ub <- p + z*sqrt((p*(1-p))/n)
+                    }
+                    out$lb
+                  }
 
 ## upper bound
 propub <- function(n, p, z=1.96, cc=TRUE){

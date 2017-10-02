@@ -133,6 +133,22 @@ reg[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), dateamk, units = "y
 ####== Generic data preparation stops here =====#####
 
 
+########
+## AGE
+########
+
+summary(reg$ageamk)
+median(reg$ageamk, na.rm = TRUE)
+sum(reg$ageamk < 10, na.rm = TRUE) #antall <10 years old
+mean(reg$ageamk, na.rm = TRUE)
+sd(reg$ageamk, na.rm = TRUE)
+
+## Test for age vs gender
+t.test(reg$ageamk ~ reg$gender) #numeric vs. factor
+var.test(reg$ageamk ~ reg$gender)
+qf(0.95, 2020, 1047)
+
+
 #####################################################
 ## Incidence of cardiac arrest per 10,000 person-year - INDATA
 #####################################################

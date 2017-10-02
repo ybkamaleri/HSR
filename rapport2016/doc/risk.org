@@ -1,0 +1,36 @@
+#+OPTIONS: ':t *:t -:t ::t <:t H:3 \n:nil ^:t arch:headline author:nil
+#+OPTIONS: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:nil e:t email:nil
+#+OPTIONS: f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t tasks:t tex:t
+#+OPTIONS: timestamp:t title:t toc:nil todo:t |:t
+#+TITLE: Risk rate for ROSC
+#+DATE: <2017-10-02 ma.>
+#+AUTHOR: Yusman Kamaleri
+#+EMAIL: ybkamaleri@gmail.com
+#+LANGUAGE: en
+#+SELECT_TAGS: export
+#+EXCLUDE_TAGS: noexport
+#+CREATOR: Emacs 25.1.1 (Org mode 9.0.9)
+
+
+#+BEGIN_SRC dot :file rosc.png :cmdline -Kdot -Tpng
+  digraph rosc {
+    P [label="Populasjon \n (n=5220143)"]
+    H [label="Hjertestans \n (n=3163)"]
+    A [label="Ambulansepersonell HLR \n (n=2731)"]
+    V [label="VedvarendeROSC \n (n=805)"]
+    O [label="Overlever 24t \n (n=606)"]
+    L [label="Overlever 30d \n (n=372)"]
+
+
+    P -> H [label=" forekomst", fontcolor=blue];
+    H -> A;
+    A -> V [label=" risk rate", fontcolor=blue];
+    V -> O;
+    V -> L;
+  }
+#+END_SRC
+
+#+ATTR_LATEX: :width 250
+#+ATTR_ORG: :width 10
+#+RESULTS:
+[[file:rosc.png]]

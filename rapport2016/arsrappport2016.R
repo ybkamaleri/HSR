@@ -107,13 +107,13 @@ reg <- regdata[AnyBystander_CPR == 1 | HLRvedakuttmedisinskpersonell == 0,]
 ## Antall pasienter
 totalN <- dim(reg)[1]
 
-####################################
-#### Background analysis ###########
-####################################
+#############################
+#### Background analysis ####
+#############################
 
 ## Antall N per HF og total populasjon
 regHF <- reg[, list(n = .N,
-                    pop = unique(pop)),
+                    pop = unique(pop)), #number of population
              by = list(ReshId, ReshNavn)]
 
 ## Antall per HF og kjønn
@@ -800,9 +800,8 @@ dev.off()
 fig1 <- NULL
 
 
-
 ###############################################
-## FILTER 2 - HLR ved akuttmedisinskpersonnell
+## FILTER 2 - HLR ved akuttmedisinskpersonnell - fil: filter2
 ###############################################
 
 reg[, fil2 := as.numeric(reg$HLRvedakuttmedisinskpersonell)] #create new col for filter variable
@@ -815,25 +814,34 @@ setindex(reg, fil2)
 filter2 <- reg[.(0), on = "fil2"] #select only "JA"
 
 
-####################
-### Vedvarende ROSC
-
+#########################
+### Vedvarende ROSC - fil: roscAlle
+#########################
 filter2[, rosc := ifelse(VedvarendeROSC == 0, 1, 2)] #recode JA to 1 else to 2
 
-roscHF <- filter2[, list(n = .N), by = list(rosc, ReshNavn, ReshId)]
+## Antall ROSC av de 2 kategorier
+## but this doesn't include 0 when the sum is 0 f.eg Finnmarkssykehus
+TESTroscHF <- filter2[, list(n = .N), by = list(rosc, ReshNavn, ReshId)]
 
-### Easy solution but have to find out better way to test that every HF should have rosc 1 and 2
-### if not then n = 0
-fin0 <- roscHF[ReshId == 601047]
-fin0[, rosc := 1][, n := 0]
+## To include 0 if the sum is 0
+roscHF <- setkey(filter2, rosc, ReshNavn)[CJ(unique(rosc), unique(ReshNavn)),
+                                          list(n = .N), by = .EACHI]
 
-roscHF <- rbindlist(list(fin0, roscHF), use.names = TRUE)
+## Sum ROSC per HF
+roscHF[, tot := sum(n), by = .(ReshNavn)]
 
+######### Not use cox the solution was found by using CJ and .EACHI above #############
+## ### Easy solution but have to find out better way to test that every HF should have rosc 1 and 2
+## ### if not then n = 0
+## fin0 <- roscHF[ReshId == 601047]
+## fin0[, rosc := 1][, n := 0] # values for column not specified will be copied
 
+## ## include HF with 0 n
+## roscHF <- rbindlist(list(fin0, roscHF), use.names = TRUE)
 
 
 ## percentage for rosc - ja and nei
-roscHF[, tot := sum(n), by = .(ReshId)][, pros := round((n / tot) * 100, digits = 1)]
+roscHF[, pros := round((n / tot) * 100, digits = 1)]
 ## proportion for rosc - ja vs nei
 roscHF[, del := n / tot] #proportion for calculating prop CI
 
@@ -990,8 +998,6 @@ roscspc[, sul := round((p + 3 * (sqrt(p * (1 - p)) / n)) * 100, digits = 2)]
 roscspc[, snitpro := round(p * 100, digits = 2)]
 
 
-
-
 ## ## When there is no cases of interest, this should be included as 0 case and 0 procent
 ## ## columns to change value when pros is 0
 ## ncol <- dim(roscspc)[2]
@@ -1029,6 +1035,143 @@ qic(x = ReshNr, y = n,
     flip = TRUE)
 
 
+########################
+## Incidence for ROSC
+########################
+
+## Calculate number of cases per HF and include 0 when there is no cases
+## To include 0 if the sum is 0
+roscsum <- setkey(filter2, rosc, ReshNavn)[CJ(unique(rosc), unique(ReshNavn)),
+                                           list(n = .N), by = .EACHI]
+
+roscsum[, tot := sum(n), by = list(ReshNavn)]
+roscJa <- roscsum[rosc == 1] # select only ROSC == 1 (JA)
+
+## Caluclate person-year per HF
+roscyear <- filter2[, list(nyear = sum(indyear), #sum person-year for healthy year
+                           pop = unique(pop) #sum population. Use 'unique' to just get one per each HF
+                           ),
+                   by = list(ReshNavn, ReshId)]
+
+## Join number of cases and person-year
+indrosc <- merge(roscJa, roscyear, by = "ReshNavn")
+
+indrosc[, ReshId := as.numeric(ReshId)]
+## how long the data has been collected i.e 0.8 = 8 month and 1.0 = 1 year
+indrosc[,  year := ifelse(ReshId == 601047, 0.8, 1.0)]
+
+## total number of exposed population only (minus number of cases)
+indrosc[, poph := pop - n]
+## person-year including healthy year for cases ie. before cardiac arrest
+indrosc[, nhealthyear := round(((pop - n) * year) + nyear, digits = 0)] #healthy year including healthy year for cases
+
+## ## change to numeric
+## for (nn in names(indrosc)[3:7]) {
+##   set(indrosc, j = nn, value = as.numeric(indrosc[[nn]]))
+## }
+
+
+## Tall for Norge (hele landet)
+coln3 <- c("n", "tot", "nyear", "pop", "year", "poph", "nhealthyear")
+iroscNorge <- indrosc[, lapply(.SD, function(x) sum(x, na.rm = TRUE)), .SDcols = coln3]
+iroscNorge[, ReshNavn := "Norge"][, ReshId := 99999]
+
+inrosccAlle <- rbind(indrosc, iroscNorge, fill = TRUE)
+
+
+indrosc <- inrosccAlle #rename to indrosc so I don't have to change all the code below
+
+proph <- "nhealthyear"
+indrosc[, cprop := n / get(proph)] #incident rate
+## Cases per 10000
+indrosc[, ir := cprop * 100000] #IR per 100000
+
+## incidence rate with lower and upper bounds
+prop <- "cprop"
+
+## ## with continuity correction
+## indrosc[, `:=` (lbw = ((get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) - ( 0.5 / get(proph))) * 100000)] #lower bound
+## indrosc[, `:=` (ubw = ((get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) + ( 0.5 / get(proph))) * 100000)] #upper bound
+## ## without continuity correction
+## indrosc[, `:=` (lb = (get(prop) - 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+## indrosc[, `:=` (ub = (get(prop) + 1.96 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+## ## ## without continuity correction 99%
+## ## indrosc[, `:=` (lb99 = (get(prop) - 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #lower bound
+## ## indrosc[, `:=` (ub99 = (get(prop) + 2.576 * sqrt(get(prop) * (1 - get(prop))) / get(proph)) * 100000)] #upper bound
+
+## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
+## test the calculation here http://www.openepi.com/PersonTime1/PersonTime1.htm
+indrosc[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
+indrosc[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
+
+## reduce digits showed
+## get the colnames for the last 5 columns
+colnm <- tail(names(indrosc), n = 5)
+
+## nrvar <- dim(indrosc)[2]
+## indrosccol <- names(indrosc)[10:12]
+for (var in colnm) {
+  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 0))
+}
+
+
+### Figure
+maxx <- max(indrosc$irul, na.rm = TRUE)
+ftit <- "Forekomst av vedvarende egensirkulasjon"
+fsub <- "(per HF, 95% konfidensintervall)"
+ytit <- "Antall per 100 000 personår"
+xlabels <- seq(0, maxx, 3)
+
+figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figinrosc
+title <- "forekomstROSCpersonyear"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+
+
+
 
 ################################################
 ## Incidence based on Exel file
@@ -1038,24 +1181,24 @@ qic(x = ReshNr, y = n,
 data2 <- fread("~/Dropbox/OUS/HSR/Rapport2016/forekomst2016.csv", dec = ",") #replace "," used in the dataset with "."
 
 ## give coloumn names
-                  setnames(data2, c("hf", "pop", "hendelse", "year", "personyr", "per100tusen", "kollasp_tilstd", "in_koltilstd", "koll_medper", "in_kollper"))
+setnames(data2, c("hf", "pop", "hendelse", "year", "personyr", "per100tusen", "kollasp_tilstd", "in_koltilstd", "koll_medper", "in_kollper"))
 
 
-                  ###
-                  ## Function calculate CI prop
+###
+## Function calculate CI prop
 
-                  ## lower bound
-                  proplb <- function(n, p, z=1.96, cc=TRUE){
-                    out <- list()
-                    if(cc){
-                      out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
-                      out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
-                    } else {
-                      out$lb <- p - z*sqrt((p*(1-p))/n)
-                      out$ub <- p + z*sqrt((p*(1-p))/n)
-                    }
-                    out$lb
-                  }
+## lower bound
+proplb <- function(n, p, z=1.96, cc=TRUE){
+  out <- list()
+  if(cc){
+    out$lb <- p - z*sqrt((p*(1-p))/n) - 0.5/n
+    out$ub <- p + z*sqrt((p*(1-p))/n) + 0.5/n
+  } else {
+    out$lb <- p - z*sqrt((p*(1-p))/n)
+    out$ub <- p + z*sqrt((p*(1-p))/n)
+  }
+  out$lb
+}
 
 ## upper bound
 propub <- function(n, p, z=1.96, cc=TRUE){

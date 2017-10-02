@@ -171,7 +171,7 @@ indata <- inAlle #rename to indata so I don't have to change all the code below
 proph <- "nhealthyear"
 indata[, cprop := n / get(proph)] #incident rate
 ## Cases per 10000
-indata[, ir := cprop * 10000] #IR per 10000
+indata[, ir := cprop * 100000] #IR per 10000
 
 ## incidence rate with lower and upper bounds
 prop <- "cprop"
@@ -188,22 +188,24 @@ prop <- "cprop"
 
 ## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
 ## test the calculation here http://www.openepi.com/PersonTime1/PersonTime1.htm
-indata[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 10000] #lower limit
-indata[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 10000] #upper limit
+indata[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
+indata[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
 
 ## reduce digits showed
 nrvar <- dim(indata)[2]
 indatacol <- names(indata)[10:12]
 for (var in indatacol) {
-  set(indata, i = NULL, j = var, value = round(indata[[var]], digits = 2))
+  set(indata, i = NULL, j = var, value = round(indata[[var]], digits = 0))
 }
 
 
 ### Figure
+maxx <- max(indata$irul, na.rm = TRUE)
+inxx <- round(maxx / 5, digits = 0)
 ftit <- "Forekomst av hjertestans"
 fsub <- "(95% konfidensintervall)"
-ytit <- "Forekomst rate per 10.000 personår"
-xlabels <- seq(0, 20, 2)
+ytit <- "Antall per 100 000 personår"
+xlabels <- seq(0, 100, 20)
 
 figinc <- ggplot(indata, aes(reorder(ReshNavn, ir), ir)) +
   geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
@@ -237,7 +239,7 @@ figinc <- ggplot(indata, aes(reorder(ReshNavn, ir), ir)) +
 
 ## save file generic
 fig1 <- figinc
-title <- "forekomst"
+title <- "forekomstpersonyear100"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))

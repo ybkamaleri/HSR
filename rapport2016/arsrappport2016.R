@@ -137,6 +137,23 @@ reg[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), dateamk, units = "y
 ## AGE
 ########
 
+## Test for normality with Shapiro-Wilks test
+sresult <- shapiro.test(reg$ageamk) #p<0.05 not Gaussian distributed
+sresult
+sresult$p.value #to check the exact value for p-value
+
+## Test with Anderson-Darling
+## install.packages("nortest")
+library(nortest)
+adres <- ad.test(reg$ageamk) #same condition as shapiro
+adres
+adres$p.value
+
+## Test with Quantile-Quantile plot
+qqnorm(reg$ageamk)
+qqline(reg$ageamk, col = "red")
+
+
 summary(reg$ageamk)
 median(reg$ageamk, na.rm = TRUE)
 sum(reg$ageamk < 10, na.rm = TRUE) #antall <10 years old
@@ -148,6 +165,9 @@ t.test(reg$ageamk ~ reg$gender) #numeric vs. factor
 var.test(reg$ageamk ~ reg$gender)
 qf(0.95, 2020, 1047)
 
+a <- rnorm(100, 1, 2)
+b <- rnorm(100, 5, 4)
+var.test(a, b)
 
 #####################################################
 ## Incidence of cardiac arrest per 10,000 person-year - INDATA

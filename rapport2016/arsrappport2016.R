@@ -817,7 +817,7 @@ dev.off()
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
 
-
+###############################################
 ###############################################
 ## FILTER 2 - HLR ved akuttmedisinskpersonnell - fil: filter2
 ###############################################
@@ -1173,6 +1173,268 @@ figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
 ## save file generic
 fig1 <- figinrosc
 title <- "forekomstROSCpersonyear"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+###################
+## Status 24 timer
+###################
+
+## ## grep "filter2$Status24timerhendelse"
+## s24 <- grep("^Status24", names(filter2), value = T)
+
+## rename to s24
+filter2[, s24 := ifelse(Status24timeretterhendelse == 0, 1, 2)]
+
+## Calculate number of cases per HF and include 0 when there is no cases
+## To include 0 if the sum is 0
+rosc24sum <- setkey(filter2, s24, ReshNavn)[CJ(unique(s24), unique(ReshNavn)),
+                                            list(n = .N), by = .EACHI]
+
+rosc24sum[, tot := sum(n), by = list(ReshNavn)]
+rosc24Ja <- rosc24sum[s24 == 1] # select only ROSC == 1 (JA)
+
+## Caluclate person-year per HF. Egentlig kunne også brukes den forrige "roscyear" men for å være sikker
+## så lages her på nytt
+rosc24year <- filter2[, list(nyear = sum(indyear), #sum person-year for healthy year
+                             pop = unique(pop) #sum population. Use 'unique' to just get one per each HF
+                             ),
+                    by = list(ReshNavn, ReshId)]
+
+## Join number of cases and person-year
+indrosc24 <- merge(rosc24Ja, rosc24year, by = "ReshNavn")
+
+indrosc24[, ReshId := as.numeric(ReshId)]
+## how long the data has been collected i.e 0.8 = 8 month and 1.0 = 1 year
+indrosc24[,  year := ifelse(ReshId == 601047, 0.8, 1.0)]
+
+## total number of exposed population only (minus number of cases)
+indrosc24[, poph := pop - n]
+## person-year including healthy year for cases ie. before cardiac arrest
+indrosc24[, nhealthyear := round(((pop - n) * year) + nyear, digits = 0)] #healthy year including healthy year for cases
+
+## ## change to numeric
+## for (nn in names(indrosc)[3:7]) {
+##   set(indrosc, j = nn, value = as.numeric(indrosc[[nn]]))
+## }
+
+
+## Tall for Norge (hele landet)
+coln24 <- c("n", "tot", "nyear", "pop", "year", "poph", "nhealthyear")
+irosc24Norge <- indrosc24[, lapply(.SD, function(x) sum(x, na.rm = TRUE)), .SDcols = coln24]
+irosc24Norge[, ReshNavn := "Norge"][, ReshId := 99999]
+
+inroscc24Alle <- rbind(indrosc24, irosc24Norge, fill = TRUE)
+
+
+indrosc <- inroscc24Alle #rename to indrosc so I don't have to change all the code below
+
+proph <- "nhealthyear"
+indrosc[, cprop := n / get(proph)] #incident rate
+## Cases per 10000
+indrosc[, ir := cprop * 100000] #IR per 100000
+
+## incidence rate with lower and upper bounds
+prop <- "cprop"
+
+## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
+## test the calculation here http://www.openepi.com/PersonTime1/PersonTime1.htm
+indrosc[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
+indrosc[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
+
+## reduce digits showed
+## get the colnames for the last 5 columns
+colnm <- tail(names(indrosc), n = 5)
+
+## nrvar <- dim(indrosc)[2]
+## indrosccol <- names(indrosc)[10:12]
+for (var in colnm) {
+  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 0))
+}
+
+
+### Figure
+maxx <- max(indrosc$irul, na.rm = TRUE)
+ftit <- "Overlevelse etter 24 timer"
+fsub <- "(per HF, 95% konfidensintervall)"
+ytit <- "Antall per 100 000 personår"
+xlabels <- seq(0, maxx, 3)
+
+figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figinrosc
+title <- "etter24timer"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+
+###################
+## Status 30 dager
+###################
+
+filter2[, .N, by = Overlevelse30dager]
+
+## rename to s30
+filter2[, s30 := ifelse(Overlevelse30dager == 0, 1, 2)]
+
+## Calculate number of cases per HF and include 0 when there is no cases
+## To include 0 if the sum is 0
+rosc30sum <- setkey(filter2, s30, ReshNavn)[CJ(unique(s30), unique(ReshNavn)),
+                                            list(n = .N), by = .EACHI]
+
+rosc30sum[, tot := sum(n), by = list(ReshNavn)]
+rosc30Ja <- rosc30sum[s30 == 1] # select only ROSC == 1 (JA)
+
+## Caluclate person-year per HF. Egentlig kunne også brukes den forrige "roscyear" men for å være sikker
+## så lages her på nytt
+rosc30year <- filter2[, list(nyear = sum(indyear), #sum person-year for healthy year
+                             pop = unique(pop) #sum population. Use 'unique' to just get one per each HF
+                             ),
+                      by = list(ReshNavn, ReshId)]
+
+## Join number of cases and person-year
+indrosc30 <- merge(rosc30Ja, rosc30year, by = "ReshNavn")
+
+indrosc30[, ReshId := as.numeric(ReshId)]
+## how long the data has been collected i.e 0.8 = 8 month and 1.0 = 1 year
+indrosc30[,  year := ifelse(ReshId == 601047, 0.8, 1.0)]
+
+## total number of exposed population only (minus number of cases)
+indrosc30[, poph := pop - n]
+## person-year including healthy year for cases ie. before cardiac arrest
+indrosc30[, nhealthyear := round(((pop - n) * year) + nyear, digits = 0)] #healthy year including healthy year for cases
+
+## ## change to numeric
+## for (nn in names(indrosc)[3:7]) {
+##   set(indrosc, j = nn, value = as.numeric(indrosc[[nn]]))
+## }
+
+
+## Tall for Norge (hele landet)
+coln30 <- c("n", "tot", "nyear", "pop", "year", "poph", "nhealthyear")
+irosc30Norge <- indrosc30[, lapply(.SD, function(x) sum(x, na.rm = TRUE)), .SDcols = coln30]
+irosc30Norge[, ReshNavn := "Norge"][, ReshId := 99999]
+
+inroscc30Alle <- rbind(indrosc30, irosc30Norge, fill = TRUE)
+
+
+indrosc <- inroscc30Alle #rename to indrosc so I don't have to change all the code below
+
+proph <- "nhealthyear"
+indrosc[, cprop := n / get(proph)] #incident rate
+## Cases per 10000
+indrosc[, ir := cprop * 100000] #IR per 100000
+
+## incidence rate with lower and upper bounds
+prop <- "cprop"
+
+## incidence rate CI with poisson distribution http://epid.blogspot.no/2012/08/how-to-calculate-confidence-interval-of.html
+## test the calculation here http://www.openepi.com/PersonTime1/PersonTime1.htm
+indrosc[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
+indrosc[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
+
+## reduce digits showed
+## get the colnames for the last 5 columns
+colnm <- tail(names(indrosc), n = 5)
+
+## nrvar <- dim(indrosc)[2]
+## indrosccol <- names(indrosc)[10:12]
+for (var in colnm) {
+  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 0))
+}
+
+
+### Figure
+maxx <- max(indrosc$irul, na.rm = TRUE)
+ftit <- "Overlevelse etter 30 dager"
+fsub <- "(per HF, 95% konfidensintervall)"
+ytit <- "Antall per 100 000 personår"
+xlabels <- seq(0, maxx, 3)
+
+figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = ir), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figinrosc
+title <- "etter30dager"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))

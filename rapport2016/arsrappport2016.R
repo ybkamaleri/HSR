@@ -130,7 +130,25 @@ reg[, indyear := as.numeric(age_calc(as.IDate("2016-01-01"), dateamk, units = "y
 ## regdata[, inyear := intid / 365]
 
 
+
+###############################################
+## FILTER 2 - HLR ved akuttmedisinskpersonnell - fil: filter2
+###############################################
+
+reg[, fil2 := as.numeric(reg$HLRvedakuttmedisinskpersonell)] #create new col for filter variable
+
+setindex(reg, NULL) #remove
+setindex(reg, fil2)
+
+## setkey(reg, fil2)
+## if setkey() is used then "on" isn't necessary for sorting temporarily. ie. setkey and on do the same thing
+filter2 <- reg[.(0), on = "fil2"] #select only "JA"
+
+
+
+#####################################################
 ####== Generic data preparation stops here =====#####
+#####################################################
 
 
 ########
@@ -189,7 +207,9 @@ indata[, poph := pop - n]
 ## person-year including healthy year for cases ie. before cardiac arrest
 indata[, nhealthyear := round(((pop - n) * year) + nyear, digits = 0)] #healthy year including healthy year for cases
 
+
 ## change to numeric
+
 for (nn in names(indata)[3:7]) {
   set(indata, j = nn, value = as.numeric(indata[[nn]]))
 }
@@ -837,19 +857,11 @@ dev.off()
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
 
-###############################################
-###############################################
+
+
+###############################################################
 ## FILTER 2 - HLR ved akuttmedisinskpersonnell - fil: filter2
-###############################################
-
-reg[, fil2 := as.numeric(reg$HLRvedakuttmedisinskpersonell)] #create new col for filter variable
-
-setindex(reg, NULL) #remove
-setindex(reg, fil2)
-
-## setkey(reg, fil2)
-## if setkey() is used then "on" isn't necessary for sorting temporarily. ie. setkey and on do the same thing
-filter2 <- reg[.(0), on = "fil2"] #select only "JA"
+###############################################################
 
 
 #########################
@@ -1273,22 +1285,35 @@ prop <- "cprop"
 indrosc[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
 indrosc[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
 
+
+### diff from ci
+indrosc[, diffll := ir - irll]
+indrosc[, difful := irul - ir]
+
+library(xlsx)
+write.xlsx(indrosc, "diff24timer.xlsx")
+
+
 ## reduce digits showed
 ## get the colnames for the last 5 columns
 colnm <- tail(names(indrosc), n = 5)
+colrr <- c("ir", "irll", "irul") #select only ir related colnames
 
 ## nrvar <- dim(indrosc)[2]
 ## indrosccol <- names(indrosc)[10:12]
-for (var in colnm) {
-  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 0))
+for (var in colrr) {
+  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 1))
 }
+
+## ## only ir is round
+## indrosc[, ir := round(ir, digits = 0)]
 
 
 ### Figure
 maxx <- max(indrosc$irul, na.rm = TRUE)
 ftit <- "Overlevelse etter 24 timer"
 fsub <- "(per HF, 95% konfidensintervall)"
-ytit <- "Antall per 100 000 personår"
+ytit <- "Insidensrate per 100 000 personår"
 xlabels <- seq(0, maxx, 3)
 
 figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
@@ -1323,7 +1348,7 @@ figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
 
 ## save file generic
 fig1 <- figinrosc
-title <- "etter24timer"
+title <- "etter24timer_rate"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
@@ -1336,6 +1361,105 @@ dev.off()
 
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
+
+
+######################
+## Geom point and text
+
+roscfig <- indrosc
+
+figrosc24point <- ggplot(roscfig, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  geom_point(size = 2.5, shape = 21, color = colb1, fill = colb1) +
+  geom_point(data = roscfig[roscfig$ReshNavn == "Norge"], size = 2.5, shape = 21, color = colb2, fill = colb2) +
+  geom_text(data = roscfig[roscfig$ReshNavn != "Norge"], aes(label = ir), size = 3,
+            vjust = -0.7, nudge_y = 0) +
+  geom_text(data = roscfig[roscfig$ReshNavn == "Norge"], aes(label = ir), size = 3, fontface = "bold",
+            vjust = -0.7, nudge_y = 0) +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+
+
+## save file generic
+fig1 <- figrosc24point
+title <- "etter24timer_point_rate"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+###################
+## Frode tilpasning 24t
+###################
+
+indrosc[, irt := round(ir, digits = 0)]
+ytit <- "Antall per 100 000 personår"
+
+figinroscf <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = reorder(irt, ir)), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = reorder(irt, ir)), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figinroscf
+title <- "etter24timer_tilpasset"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
 
 
 
@@ -1404,34 +1528,47 @@ prop <- "cprop"
 indrosc[, irll := (cprop - 1.96 * cprop / sqrt(n)) * 100000] #lower limit
 indrosc[, irul := (cprop + 1.96 * cprop / sqrt(n)) * 100000] #upper limit
 
+
+### diff from ci
+indrosc[, diffll := ir - irll]
+indrosc[, difful := irul - ir]
+write.xlsx(indrosc, "30d.xlsx")
+
+
+## ## round number for ir
+## indrosc[, ir := round(ir, digits = 0)]
+
 ## reduce digits showed
 ## get the colnames for the last 5 columns
 colnm <- tail(names(indrosc), n = 5)
+colrr <- c("ir", "irll", "irul") #select only ir related colnames
 
 ## nrvar <- dim(indrosc)[2]
 ## indrosccol <- names(indrosc)[10:12]
-for (var in colnm) {
-  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 0))
+for (var in colrr) {
+  set(indrosc, i = NULL, j = var, value = round(indrosc[[var]], digits = 1))
 }
+
+
 
 
 ### Figure
 maxx <- max(indrosc$irul, na.rm = TRUE)
 ftit <- "Overlevelse etter 30 dager"
 fsub <- "(per HF, 95% konfidensintervall)"
-ytit <- "Antall per 100 000 personår"
+ytit <- "Insidensrate per 100 000 personår"
 xlabels <- seq(0, maxx, 3)
 
 figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
   geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
   ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
-  geom_label(aes(label = ir), size = 3,
+  geom_label(aes(label = reorder(irt, ir)), size = 3,
              label.padding = unit(0.1, "lines"),
              ##label.r = unit(0.2, "lines"),
              label.size = 0,
              fill = "#c6dbef",
              color = "black") +
-  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = ir), size = 3,
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = reorder(irt, ir)), size = 3,
              label.padding = unit(0.1, "lines"),
              ##label.r = unit(0.2, "lines"),
              label.size = 0,
@@ -1454,7 +1591,7 @@ figinrosc <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
 
 ## save file generic
 fig1 <- figinrosc
-title <- "etter30dager"
+title <- "etter30dager_rate"
 
 ## Save figure ================================
 fig1a <- ggplot_gtable(ggplot_build(fig1))
@@ -1468,6 +1605,102 @@ dev.off()
 ## reset fig1 - to avoid wrong figure
 fig1 <- NULL
 
+
+
+######################
+## Geom point and text
+
+roscfig <- indrosc
+
+figrosc30point <- ggplot(roscfig, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  geom_point(size = 2.5, shape = 21, color = colb1, fill = colb1) +
+  geom_point(data = roscfig[roscfig$ReshNavn != "Norge"], size = 2.5, shape = 21, color = colb1, fill = colb1) +
+  geom_point(data = roscfig[roscfig$ReshNavn == "Norge"], size = 2.5, shape = 21, color = colb2, fill = colb2) +
+  geom_text(data = roscfig[roscfig$ReshNavn != "Norge"], aes(label = ir), size = 3, vjust = -0.7, nudge_y = 0) +
+  geom_text(data = roscfig[roscfig$ReshNavn == "Norge"], aes(label = ir), size = 3, vjust = -0.7, nudge_y = 0, fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+
+
+## save file generic
+fig1 <- figrosc30point
+title <- "etter30dager_point_rate"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
+
+
+###################
+## Frode tilpasning 30d
+###################
+
+indrosc[, irt := round(ir, digits = 0)]
+ytit <- "Antall per 100 000 personår"
+
+figinroscf <- ggplot(indrosc, aes(reorder(ReshNavn, ir), ir)) +
+  geom_errorbar(aes(ymax = irul, ymin = irll), width = 0.25, size = 0.4) +
+  ##geom_point(size = 2, shape = 23, color = colb1, fill = colb1) +
+  geom_label(aes(label = reorder(irt, ir)), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = "#c6dbef",
+             color = "black") +
+  geom_label(data = indrosc[indrosc$ReshId == 99999], aes(label = reorder(irt, ir)), size = 3,
+             label.padding = unit(0.1, "lines"),
+             ##label.r = unit(0.2, "lines"),
+             label.size = 0,
+             fill = colb2,
+             color = "white",
+             fontface = "bold") +
+  labs(title = ftit, subtitle = fsub, y = ytit) +
+  coord_flip() +
+  scale_y_continuous(breaks = xlabels) +
+  theme2 +
+  theme(
+    panel.grid.major.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    ##panel.grid.minor.x = element_line(color = "grey", size = 0.1, linetype = 2),
+    panel.grid.major.y = element_line(color = "grey", size = 0.1, linetype = 1),
+    axis.line.x = element_line(size = 0.3)
+  )
+
+### other option for geom_label - label.size = 0 means no line around
+
+
+## save file generic
+fig1 <- figinroscf
+title <- "etter30dager_tilpasset"
+
+## Save figure ================================
+fig1a <- ggplot_gtable(ggplot_build(fig1))
+fig1a$layout$clip[fig1a$layout$name == 'panel'] <- 'off'
+grid.draw(fig1a)
+cowplot::save_plot(paste0(savefig, "/", title, ".jpg"), fig1a, base_height = 7, base_width = 7)
+cowplot::save_plot(paste0(savefig, "/", title, ".pdf"), fig1a, base_height = 7, base_width = 7)
+## ggsave("~/Git-work/HSR/arsrapport/fig1a.jpg")
+dev.off()
+
+## reset fig1 - to avoid wrong figure
+fig1 <- NULL
 
 
 
